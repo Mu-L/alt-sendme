@@ -38,6 +38,7 @@ const LANGUAGES = [
 	{ value: 'th', label: 'Thai', countryCode: 'TH' },
 	{ value: 'tr', label: 'Türkçe', countryCode: 'TR' },
 	{ value: 'uk', label: 'Українська', countryCode: 'UA' },
+	{ value: 'uz-Latn', label: "O'zbekcha", countryCode: 'UZ' },
 	{ value: 'zh-CN', label: '简体中文', countryCode: 'CN' },
 	{ value: 'zh-TW', label: '繁體中文', countryCode: 'TW' },
 ]
