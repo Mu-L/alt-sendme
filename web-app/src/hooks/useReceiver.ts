@@ -4,7 +4,6 @@ import { downloadDir, join } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
-import { toastManager } from '../components/ui/toast'
 import { useTranslation } from '../i18n/react-i18next-compat'
 import { sendSystemNotification } from '../lib/systemNotification'
 import type { AlertDialogState, AlertType } from '../types/ui'
@@ -240,12 +239,6 @@ export function useReceiver(): UseReceiverReturn {
 					downloadPath: savePathRef.current,
 				}
 				setTransferMetadata(metadata)
-
-				toastManager.add({
-					title: t('common:receiver.downloadCompleted'),
-					description: displayName,
-					type: 'success',
-				})
 
 				void sendSystemNotification({
 					title: t('common:receiver.downloadCompleted'),
