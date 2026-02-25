@@ -5,6 +5,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '../i18n/react-i18next-compat'
+import { sendSystemNotification } from '../lib/systemNotification'
 import type { AlertDialogState, AlertType } from '../types/ui'
 import type { TransferMetadata, TransferProgress } from '../types/transfer'
 import { SpeedAverager, calculateETA } from '../utils/etaUtils'
@@ -141,13 +142,23 @@ export function useReceiver(): UseReceiverReturn {
 	}, [])
 
 	useEffect(() => {
-		let unlistenStart: UnlistenFn | undefined
-		let unlistenProgress: UnlistenFn | undefined
-		let unlistenComplete: UnlistenFn | undefined
-		let unlistenFileNames: UnlistenFn | undefined
+		let disposed = false
+		const unlistenFns: UnlistenFn[] = []
+
+		const registerListener = async (
+			eventName: string,
+			handler: Parameters<typeof listen>[1]
+		) => {
+			const unlisten = await listen(eventName, handler)
+			if (disposed) {
+				unlisten()
+				return
+			}
+			unlistenFns.push(unlisten)
+		}
 
 		const setupListeners = async () => {
-			unlistenStart = await listen('receive-started', () => {
+			await registerListener('receive-started', () => {
 				setIsTransporting(true)
 				setIsCompleted(false)
 				setTransferStartTime(Date.now())
@@ -155,7 +166,7 @@ export function useReceiver(): UseReceiverReturn {
 				speedAveragerRef.current.reset()
 			})
 
-			unlistenProgress = await listen('receive-progress', (event: any) => {
+			await registerListener('receive-progress', (event: any) => {
 				try {
 					const payload = event.payload as string
 					const parts = payload.split(':')
@@ -189,7 +200,7 @@ export function useReceiver(): UseReceiverReturn {
 				}
 			})
 
-			unlistenFileNames = await listen('receive-file-names', (event: any) => {
+			await registerListener('receive-file-names', (event: any) => {
 				try {
 					const payload = event.payload as string
 					const names = JSON.parse(payload) as string[]
@@ -201,7 +212,7 @@ export function useReceiver(): UseReceiverReturn {
 				}
 			})
 
-			unlistenComplete = await listen('receive-completed', () => {
+			await registerListener('receive-completed', () => {
 				setIsTransporting(false)
 				setIsCompleted(true)
 				setTransferProgress(null)
@@ -238,6 +249,11 @@ export function useReceiver(): UseReceiverReturn {
 					downloadPath: savePathRef.current,
 				}
 				setTransferMetadata(metadata)
+
+				void sendSystemNotification({
+					title: t('common:receiver.downloadCompleted'),
+					body: displayName,
+				})
 			})
 		}
 
@@ -246,12 +262,12 @@ export function useReceiver(): UseReceiverReturn {
 		})
 
 		return () => {
-			if (unlistenStart) unlistenStart()
-			if (unlistenProgress) unlistenProgress()
-			if (unlistenComplete) unlistenComplete()
-			if (unlistenFileNames) unlistenFileNames()
+			disposed = true
+			unlistenFns.forEach((unlisten) => {
+				unlisten()
+			})
 		}
-	}, [])
+	}, [t])
 
 	const showAlert = (
 		title: string,
