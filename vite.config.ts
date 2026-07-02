@@ -6,10 +6,10 @@ const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
 	plugins: [react()],
-	root: path.resolve(__dirname, './web-app'),
+	root: path.resolve(__dirname, './frontend'),
 	resolve: {
 		alias: {
-			'@': path.resolve(__dirname, './web-app/src'),
+			'@': path.resolve(__dirname, './frontend/src'),
 			'lottie-web': 'lottie-web/build/player/lottie_light',
 		},
 	},

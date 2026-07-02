@@ -4,7 +4,7 @@
 	"version": "0.4.2",
 	"identifier": "com.altsendme.desktop",
 	"build": {
-		"frontendDist": "../web-app/dist",
+		"frontendDist": "../frontend/dist",
 		"devUrl": "http://localhost:1420",
 		"beforeDevCommand": "npm run dev",
 		"beforeBuildCommand": "npm run build"

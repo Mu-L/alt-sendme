@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const outputDir = 'tmp/lib-test-dist'
-const testDir = join(outputDir, 'web-app/src/lib')
+const testDir = join(outputDir, 'frontend/src/lib')
 const tscBin = join('node_modules', 'typescript', 'bin', 'tsc')
 
 function collectTestFiles(directory) {

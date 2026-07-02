@@ -10,7 +10,7 @@ on:
 
 jobs:
   lint:
-    name: Linting `web-app` codebase
+    name: Linting `frontend` codebase
     runs-on: ubuntu-latest
 
     steps:

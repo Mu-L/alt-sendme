@@ -23,9 +23,9 @@
 		/* Path mapping */
 		"baseUrl": ".",
 		"paths": {
-			"@/*": ["./web-app/src/*"]
+			"@/*": ["./frontend/src/*"]
 		}
 	},
-	"include": ["./web-app/**/*.ts", "./web-app/**/*.tsx"],
+	"include": ["./frontend/**/*.ts", "./frontend/**/*.tsx"],
 	"references": [{ "path": "./tsconfig.node.json" }]
 }

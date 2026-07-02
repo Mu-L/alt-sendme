@@ -8,8 +8,8 @@
 		"types": ["node"]
 	},
 	"include": [
-		"web-app/src/lib/**/*.test.ts",
-		"web-app/src/lib/**/*.test.tsx",
-		"web-app/src/components/**/*.type-test.tsx"
+		"frontend/src/lib/**/*.test.ts",
+		"frontend/src/lib/**/*.test.tsx",
+		"frontend/src/components/**/*.type-test.tsx"
 	]
 }
