@@ -1,5 +1,11 @@
+#[cfg(not(target_arch = "wasm32"))]
 pub mod export_native;
+#[cfg(target_arch = "wasm32")]
+pub mod export_wasm;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod import_native;
+#[cfg(target_arch = "wasm32")]
+pub mod import_wasm;
 pub mod receive;
 pub mod send;
 pub mod storage;

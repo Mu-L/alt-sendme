@@ -3,7 +3,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 // Import the EventEmitter trait - we'll define it here or import it
+#[cfg(not(target_arch = "wasm32"))]
 pub trait EventEmitter: Send + Sync {
+    fn emit_event(&self, event_name: &str) -> Result<(), String>;
+    fn emit_event_with_payload(&self, event_name: &str, payload: &str) -> Result<(), String>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait EventEmitter {
     fn emit_event(&self, event_name: &str) -> Result<(), String>;
     fn emit_event_with_payload(&self, event_name: &str, payload: &str) -> Result<(), String>;
 }
@@ -65,8 +72,27 @@ pub struct SendResult {
     pub router: iroh::protocol::Router, // Keeps the server running and protocols active
     pub temp_tag: iroh_blobs::api::TempTag, // Prevents data from being garbage collected
     pub _progress_handle: n0_future::task::AbortOnDropHandle<anyhow::Result<()>>, // Keeps event channel open
+    #[cfg(not(target_arch = "wasm32"))]
     pub _store: iroh_blobs::store::fs::FsStore, // Keeps the blob storage alive
     pub blobs_data_dir: AutoCleanupDir,         // Drop last to cleanup after handles are released
+}
+
+/// Active browser share session (in-memory blob store).
+#[cfg(target_arch = "wasm32")]
+pub struct WasmShareSession {
+    pub ticket: String,
+    pub hash: String,
+    pub size: u64,
+    pub router: iroh::protocol::Router,
+    pub temp_tag: iroh_blobs::api::TempTag,
+    pub store: iroh_blobs::store::mem::MemStore,
+    pub _progress_handle: n0_future::task::AbortOnDropHandle<anyhow::Result<()>>,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub struct WasmReceiveResult {
+    pub file_name: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -217,16 +243,52 @@ pub fn apply_options(addr: &mut iroh::EndpointAddr, opts: AddrInfoOptions) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+use anyhow::Context;
+use iroh::TransportAddr;
+#[cfg(not(target_arch = "wasm32"))]
+use std::str::FromStr;
+
+#[cfg(target_arch = "wasm32")]
+mod wasm_secret {
+    use std::sync::{Mutex, OnceLock};
+
+    static SECRET: OnceLock<Mutex<Option<iroh::SecretKey>>> = OnceLock::new();
+
+    pub fn get_or_create() -> anyhow::Result<iroh::SecretKey> {
+        let slot = SECRET.get_or_init(|| Mutex::new(None));
+        let mut guard = slot.lock().expect("wasm secret mutex poisoned");
+        if let Some(key) = guard.as_ref() {
+            return Ok(key.clone());
+        }
+        let key = iroh::SecretKey::generate();
+        *guard = Some(key.clone());
+        Ok(key)
+    }
+
+    pub fn set(key: iroh::SecretKey) {
+        let slot = SECRET.get_or_init(|| Mutex::new(None));
+        *slot.lock().expect("wasm secret mutex poisoned") = Some(key);
+    }
+}
+
 pub fn get_or_create_secret() -> anyhow::Result<iroh::SecretKey> {
-    match std::env::var("IROH_SECRET") {
-        Ok(secret) => iroh::SecretKey::from_str(&secret).context("invalid secret"),
-        Err(_) => {
-            let key = iroh::SecretKey::generate();
-            Ok(key)
+    #[cfg(target_arch = "wasm32")]
+    {
+        return wasm_secret::get_or_create();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        match std::env::var("IROH_SECRET") {
+            Ok(secret) => iroh::SecretKey::from_str(&secret).context("invalid secret"),
+            Err(_) => Ok(iroh::SecretKey::generate()),
         }
     }
 }
 
-use anyhow::Context;
-use iroh::TransportAddr;
-use std::str::FromStr;
+/// Persist the node secret key for browser sessions (survives page reload when set from JS).
+#[cfg(target_arch = "wasm32")]
+pub fn set_wasm_secret_key(key: iroh::SecretKey) {
+    wasm_secret::set(key);
+}

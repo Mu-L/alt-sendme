@@ -1,27 +1,37 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::core::import_native;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::core::storage;
 use crate::core::types::{
-    apply_options, get_or_create_secret, AddrInfoOptions, AppHandle, AutoCleanupDir, FileMetadata,
-    SendOptions, SendResult,
+    apply_options, get_or_create_secret, AddrInfoOptions, AppHandle, FileMetadata, SendOptions,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::core::types::{AutoCleanupDir, SendResult};
+#[cfg(not(target_arch = "wasm32"))]
 use anyhow::ensure;
 use iroh::endpoint::presets;
 use iroh::protocol::{AcceptError, ProtocolHandler};
+#[cfg(not(target_arch = "wasm32"))]
 use iroh::{address_lookup::pkarr::PkarrPublisher, endpoint::RelayMode, Endpoint};
+#[cfg(target_arch = "wasm32")]
+use iroh::{endpoint::RelayMode, Endpoint};
 use iroh_blobs::{
     api::TempTag,
     provider::events::{ConnectMode, EventMask, EventSender, RequestMode},
-    store::fs::FsStore,
     ticket::BlobTicket,
     BlobFormat, BlobsProtocol,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use iroh_blobs::store::fs::FsStore;
 use n0_future::{task::AbortOnDropHandle, StreamExt};
 use std::io::ErrorKind;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-use tokio::{select, sync::mpsc};
+use tokio::sync::mpsc;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::select;
 
 // To avoid encoding thumbnail into ticket causing excessively long tickets, we use a custom metadata protocol to
 // send metadata seprately from the file data. After the receive end sticks the ticket, a seprate connection will
@@ -162,6 +172,7 @@ fn emit_active_connection_count(app_handle: &AppHandle, count: usize) {
 /// sharing multiple files/directories at once and provides better filename handling.
 ///
 /// todo: Testing and cli should be migrated to `start_share_items`
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn start_share(
     path: PathBuf,
     options: SendOptions,
@@ -173,6 +184,7 @@ pub async fn start_share(
 
 /// Starts sharing the provided paths (files or directories).
 /// If multiple paths are provided, they will be shared as a collection.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn start_share_items(
     paths: Vec<PathBuf>,
     options: SendOptions,
@@ -245,26 +257,126 @@ pub async fn start_share_items(
             &app_handle_clone,
             entry_type_for_progress,
             relay_mode,
-            blobs_data_dir2,
+            Some(blobs_data_dir2),
             progress_rx,
         )
         .await
+        .map(|outcome| SendResult {
+            ticket: outcome.ticket,
+            hash: outcome.hash,
+            size: outcome.size,
+            entry_type: outcome.entry_type,
+            router: outcome.router,
+            temp_tag: outcome.temp_tag,
+            blobs_data_dir: AutoCleanupDir::new(outcome.cleanup_dir.expect("native cleanup dir")),
+            _progress_handle: outcome.progress_handle,
+            _store: outcome.store,
+        })
     };
 
-    let send_result = select! {
-        x = setup => x?,
-        _ = tokio::signal::ctrl_c() => {
-            anyhow::bail!("Operation cancelled");
+    let send_result = {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            select! {
+                x = setup => x?,
+                _ = tokio::signal::ctrl_c() => {
+                    anyhow::bail!("Operation cancelled");
+                }
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            setup.await?
         }
     };
 
     Ok(send_result)
 }
 
+/// Share a single in-memory file from the browser (relay-only tickets).
+#[cfg(target_arch = "wasm32")]
+pub async fn start_share_bytes(
+    file_name: String,
+    bytes: Vec<u8>,
+    options: SendOptions,
+    app_handle: &AppHandle,
+    metadata: Option<FileMetadata>,
+) -> anyhow::Result<crate::core::types::WasmShareSession> {
+    use crate::core::import_wasm;
+    use crate::core::storage::create_send_mem_store;
+    use crate::core::types::WasmShareSession;
+
+    let secret_key = get_or_create_secret()?;
+    let relay_mode: RelayMode = options.relay_mode.clone().into();
+    let ticket_type = AddrInfoOptions::Relay;
+
+    let builder = Endpoint::builder(presets::N0)
+        .alpns(vec![iroh_blobs::ALPN.to_vec(), METADATA_ALPN.to_vec()])
+        .secret_key(secret_key)
+        .relay_mode(relay_mode.clone());
+
+    let (progress_tx, progress_rx) = mpsc::channel(64);
+    let endpoint = builder.bind().await?;
+    let store = create_send_mem_store();
+
+    let blobs = BlobsProtocol::new(
+        &store,
+        Some(EventSender::new(
+            progress_tx,
+            EventMask {
+                connected: ConnectMode::Notify,
+                get: RequestMode::NotifyLog,
+                ..EventMask::DEFAULT
+            },
+        )),
+    );
+
+    let (temp_tag, size) =
+        import_wasm::import_single_file_bytes(file_name, bytes, blobs.store()).await?;
+
+    let outcome = run_share_session(
+        endpoint,
+        store,
+        blobs,
+        temp_tag,
+        size,
+        metadata,
+        ticket_type,
+        app_handle,
+        "file".to_string(),
+        relay_mode,
+        None,
+        progress_rx,
+    )
+    .await?;
+
+    Ok(WasmShareSession {
+        ticket: outcome.ticket,
+        hash: outcome.hash,
+        size: outcome.size,
+        router: outcome.router,
+        temp_tag: outcome.temp_tag,
+        store: outcome.store,
+        _progress_handle: outcome.progress_handle,
+    })
+}
+
 /// Shared send orchestration after blobs are imported into the store.
-async fn run_share_session(
+struct ShareSessionOutcome<S> {
+    ticket: String,
+    hash: String,
+    size: u64,
+    entry_type: String,
+    router: iroh::protocol::Router,
+    temp_tag: TempTag,
+    store: S,
+    progress_handle: AbortOnDropHandle<anyhow::Result<()>>,
+    cleanup_dir: Option<PathBuf>,
+}
+
+async fn run_share_session<S>(
     endpoint: Endpoint,
-    store: FsStore,
+    store: S,
     blobs: BlobsProtocol,
     temp_tag: TempTag,
     size: u64,
@@ -273,9 +385,12 @@ async fn run_share_session(
     app_handle: &AppHandle,
     entry_type: String,
     relay_mode: RelayMode,
-    blobs_data_dir: PathBuf,
+    cleanup_dir: Option<PathBuf>,
     progress_rx: mpsc::Receiver<iroh_blobs::provider::events::ProviderMessage>,
-) -> anyhow::Result<SendResult> {
+) -> anyhow::Result<ShareSessionOutcome<S>>
+where
+    S: Send + Sync + 'static,
+{
     let progress_handle = n0_future::task::spawn(show_provide_progress_with_logging(
         progress_rx,
         app_handle.clone(),
@@ -303,16 +418,16 @@ async fn run_share_session(
 
     let ticket = BlobTicket::new(addr, hash, BlobFormat::HashSeq);
 
-    Ok(SendResult {
+    Ok(ShareSessionOutcome {
         ticket: ticket.to_string(),
         hash: hash.to_hex().to_string(),
         size,
         entry_type,
         router,
         temp_tag,
-        blobs_data_dir: AutoCleanupDir::new(blobs_data_dir),
-        _progress_handle: AbortOnDropHandle::new(progress_handle),
-        _store: store,
+        store,
+        progress_handle: AbortOnDropHandle::new(progress_handle),
+        cleanup_dir,
     })
 }
 

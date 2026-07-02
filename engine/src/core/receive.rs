@@ -1,26 +1,35 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::core::export_native;
-use crate::core::send::METADATA_ALPN;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::core::storage;
+use crate::core::send::METADATA_ALPN;
 use crate::core::types::{
-    get_or_create_secret, AppHandle, FileMetadata, ReceiveOptions, ReceiveResult,
+    get_or_create_secret, AppHandle, FileMetadata, ReceiveOptions,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::core::types::ReceiveResult;
 use iroh::endpoint::presets;
+#[cfg(not(target_arch = "wasm32"))]
 use iroh::{address_lookup::dns::DnsAddressLookup, Endpoint, TransportAddr};
+#[cfg(target_arch = "wasm32")]
+use iroh::{Endpoint, TransportAddr};
 use iroh_blobs::{
-    api::remote::GetProgressItem,
+    api::{remote::GetProgressItem, Store},
     format::collection::Collection,
     get::{request::get_hash_seq_and_sizes, GetError, Stats},
-    store::fs::FsStore,
     ticket::BlobTicket,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use iroh_blobs::store::fs::FsStore;
 use n0_future::StreamExt;
 use std::str::FromStr;
 use std::time::Instant;
 use tokio::{
     io::AsyncReadExt,
-    select,
     time::{timeout, Duration},
 };
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::select;
 
 // Helper function to emit events through the app handle
 fn emit_event(app_handle: &AppHandle, event_name: &str) {
@@ -125,7 +134,7 @@ async fn download_to_store(
     ticket: BlobTicket,
     addr: iroh::EndpointAddr,
     endpoint: &Endpoint,
-    db: &FsStore,
+    db: &Store,
     app_handle: &AppHandle,
 ) -> anyhow::Result<DownloadToStoreResult> {
     let hash_and_format = ticket.hash_and_format();
@@ -226,7 +235,7 @@ async fn download_to_store(
         (Stats::default(), total_files, payload_bytes)
     };
 
-    let collection = Collection::load(hash_and_format.hash, db.as_ref()).await?;
+    let collection = Collection::load(hash_and_format.hash, db).await?;
 
     let mut file_names: Vec<String> = Vec::new();
     for (name, _hash) in collection.iter() {
@@ -247,6 +256,7 @@ async fn download_to_store(
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn download(
     ticket_str: String,
     options: ReceiveOptions,
@@ -281,7 +291,7 @@ pub async fn download(
     let db2 = db.clone();
 
     let fut = async move {
-        let downloaded = download_to_store(ticket, addr, &endpoint, &db, &app_handle).await?;
+        let downloaded = download_to_store(ticket, addr, &endpoint, db.as_ref(), &app_handle).await?;
 
         let output_dir = options.output_dir.unwrap_or_else(|| {
             dirs::download_dir().unwrap_or_else(|| std::env::current_dir().unwrap())
@@ -313,10 +323,7 @@ pub async fn download(
             Ok(x) => x,
             Err(e) => {
                 tracing::error!("Download operation failed: {}", e);
-                // Transfer broke — keep what we've got so the next try can resume.
-                // Disarm before any `?` so an error here can't wipe it.
                 cleanup_guard.disarm();
-                // make sure we shutdown the db before exiting
                 db2.shutdown().await?;
                 anyhow::bail!("error: {e}");
             }
@@ -342,6 +349,46 @@ pub async fn download(
     })
 }
 
+/// Download a ticket into memory for the browser.
+#[cfg(target_arch = "wasm32")]
+pub async fn download_bytes(
+    ticket_str: String,
+    options: ReceiveOptions,
+    app_handle: AppHandle,
+) -> anyhow::Result<crate::core::types::WasmReceiveResult> {
+    use crate::core::export_wasm;
+    use crate::core::storage::create_recv_mem_store;
+    use crate::core::types::WasmReceiveResult;
+
+    let ticket = BlobTicket::from_str(&ticket_str)?;
+    let addr = ticket.addr().clone();
+    let secret_key = get_or_create_secret()?;
+
+    let builder = Endpoint::builder(presets::Minimal)
+        .alpns(vec![])
+        .secret_key(secret_key)
+        .relay_mode(options.relay_mode.clone().into());
+
+    anyhow::ensure!(
+        ticket.addr().relay_urls().count() > 0,
+        "browser receive requires relay addresses in the ticket"
+    );
+
+    let endpoint = builder.bind().await?;
+    let store = create_recv_mem_store();
+
+    let downloaded =
+        download_to_store(ticket, addr, &endpoint, store.as_ref(), &app_handle).await?;
+
+    let (file_name, bytes) =
+        export_wasm::export_single_file_bytes(store.as_ref(), downloaded.collection).await?;
+
+    endpoint.close().await;
+    emit_event(&app_handle, "receive-completed");
+
+    Ok(WasmReceiveResult { file_name, bytes })
+}
+
 /// # Description
 /// Fetches metadata for a given ticket without downloading the file data. This is used to display file information (name, size, thumbnail) in the UI before the user decides to download.
 /// # Returns
@@ -363,14 +410,17 @@ pub async fn fetch_metadata(
         .secret_key(secret_key)
         .relay_mode(options.relay_mode.into());
 
-    if ticket.addr().relay_urls().count() == 0 && ticket.addr().ip_addrs().count() == 0 {
-        builder = builder.address_lookup(DnsAddressLookup::n0_dns());
-    }
-    if let Some(addr) = options.magic_ipv4_addr {
-        builder = builder.bind_addr(addr)?;
-    }
-    if let Some(addr) = options.magic_ipv6_addr {
-        builder = builder.bind_addr(addr)?;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if ticket.addr().relay_urls().count() == 0 && ticket.addr().ip_addrs().count() == 0 {
+            builder = builder.address_lookup(DnsAddressLookup::n0_dns());
+        }
+        if let Some(addr) = options.magic_ipv4_addr {
+            builder = builder.bind_addr(addr)?;
+        }
+        if let Some(addr) = options.magic_ipv6_addr {
+            builder = builder.bind_addr(addr)?;
+        }
     }
 
     let endpoint = builder.bind().await?;
