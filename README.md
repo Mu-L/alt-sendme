@@ -34,7 +34,6 @@ Why rely on WeTransfer, Dropbox, or Google Drive when you can reliably and easil
 
 ## Real-world stats
 
-<div align="center">
 
 | Metric | Reported |
 |--------|--------|
@@ -45,7 +44,7 @@ Why rely on WeTransfer, Dropbox, or Google Drive when you can reliably and easil
 
 *Transfer throughput depends on your device, network, and connection path.*
 
-</div>
+
 
 ## Features
 
