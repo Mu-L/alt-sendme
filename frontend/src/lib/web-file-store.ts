@@ -36,3 +36,15 @@ export function webFilePathKey(file: File): string {
 		.webkitRelativePath
 	return relative && relative.length > 0 ? relative : file.name
 }
+
+/** All registered files whose path equals `path` or lives under `path/`. */
+export function listWebFilesUnderPath(path: string): File[] {
+	const prefix = `${path}/`
+	const files: File[] = []
+	for (const [filePath, file] of filesByPath) {
+		if (filePath === path || filePath.startsWith(prefix)) {
+			files.push(file)
+		}
+	}
+	return files
+}

@@ -23,6 +23,7 @@ import {
 	webFilePathKey,
 } from './web-file-store'
 import { WebPreviewError } from './web-preview-error'
+import { buildWebSendMetadataForPaths } from './web-send-metadata'
 
 type DialogOptions = {
 	multiple?: boolean
@@ -52,15 +53,6 @@ function webTransferUnavailable(): never {
 	throw new WebPreviewError(
 		'Web transfers require a built WASM engine. Run: pnpm build:wasm'
 	)
-}
-
-function buildWebSendMetadata(file: File) {
-	return JSON.stringify({
-		file_name: file.name,
-		item_count: 1,
-		size: file.size,
-		mime_type: file.type || 'application/octet-stream',
-	})
 }
 
 function relayFromArgs(args?: Record<string, unknown>): RelayConfigArg | undefined {
@@ -118,7 +110,7 @@ async function invokeWebTransfer<T>(
 			const ticket = await wasmSendFile(
 				file.name,
 				bytes,
-				buildWebSendMetadata(file),
+				buildWebSendMetadataForPaths([path]),
 				relayFromArgs(args)
 			)
 			return ticket as T
