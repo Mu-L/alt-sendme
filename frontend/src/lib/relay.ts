@@ -1,8 +1,5 @@
 import { useAppSettingStore } from '../store/app-setting'
-import {
-	buildRelayConfigArg,
-	type RelayConfigArg,
-} from './relay-config'
+import { buildRelayConfigArg, type RelayConfigArg } from './relay-config'
 
 export type { RelayConfigArg, RelayFallback, RelayMode } from './relay-config'
 

@@ -3,6 +3,7 @@
 import { Dialog as SheetPrimitive } from '@base-ui/react/dialog'
 import { XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getWebAppOverlayContainer } from '@/lib/platformStyles'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -68,8 +69,10 @@ function SheetPopup({
 	side?: 'right' | 'left' | 'top' | 'bottom'
 	inset?: boolean
 }) {
+	const overlayContainer = getWebAppOverlayContainer()
+
 	return (
-		<SheetPortal>
+		<SheetPortal container={overlayContainer}>
 			<SheetBackdrop />
 			<SheetViewport inset={inset} side={side}>
 				<SheetPrimitive.Popup

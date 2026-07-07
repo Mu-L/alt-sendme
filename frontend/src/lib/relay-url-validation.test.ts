@@ -42,7 +42,10 @@ describe('relay URL validation', () => {
 		const url = 'https://user:secret@relay.example.com'
 
 		assert.equal(isValidRelayUrl(url), false)
-		assert.equal(relayUrlValidationMessageKey(url), RELAY_URL_INVALID_MESSAGE_KEY)
+		assert.equal(
+			relayUrlValidationMessageKey(url),
+			RELAY_URL_INVALID_MESSAGE_KEY
+		)
 		assert.equal(
 			RELAY_URL_INVALID_MESSAGE_KEY,
 			'settings.network.relay.urlInvalidHint'

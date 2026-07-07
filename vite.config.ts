@@ -2,14 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 
-const host = process.env.TAURI_DEV_HOST
+const tauriDevHost = process.env.TAURI_DEV_HOST
 
 export default defineConfig(({ mode }) => {
 	const isWeb = mode === 'web'
+	const webBase = process.env.WEB_BASE ?? '/'
 
 	return {
 		plugins: [react()],
-		base: isWeb ? '/web/' : '/',
+		base: isWeb ? webBase : '/',
 		root: path.resolve(__dirname, './frontend'),
 		resolve: {
 			alias: {
@@ -18,7 +19,9 @@ export default defineConfig(({ mode }) => {
 			},
 		},
 		define: {
-			// Single string so platform.ts can derive flags; Vite replaces import.meta.env reliably
+			'import.meta.env.VITE_APP_PLATFORM': JSON.stringify(
+				isWeb ? 'web' : 'tauri'
+			),
 			'import.meta.env.TAURI_PLATFORM': JSON.stringify(
 				process.env.TAURI_ENV_PLATFORM ?? ''
 			),
@@ -27,23 +30,24 @@ export default defineConfig(({ mode }) => {
 		clearScreen: false,
 		// 2. tauri expects a fixed port, fail if that port is not available
 		server: {
-			port: isWeb ? 3001 : 1420,
+			port: isWeb ? 3000 : 1420,
 			strictPort: true,
-			host: host || false,
-			hmr: host
-				? {
-						protocol: 'ws',
-						host,
-						port: isWeb ? 3002 : 1421,
-					}
-				: undefined,
+			host: isWeb ? false : (tauriDevHost ?? false),
+			hmr:
+				!isWeb && tauriDevHost
+					? {
+							protocol: 'ws',
+							host: tauriDevHost,
+							port: 1421,
+						}
+					: undefined,
 			watch: {
 				ignored: ['**/src-tauri/**'],
 				usePolling: true,
 			},
 		},
 		preview: {
-			port: isWeb ? 3001 : 4173,
+			port: isWeb ? 3000 : 4173,
 			strictPort: true,
 		},
 	}

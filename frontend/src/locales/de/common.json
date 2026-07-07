@@ -69,7 +69,7 @@
 		"noFolderSelected": "Kein Ordner ausgewählt",
 		"conflictsMore": "... und {{count}} weitere",
 		"pasteTicket": "Ticket hier einfügen:",
-		"ticketPlaceholder": "sendme Empfangsticket...",
+		"ticketPlaceholder": "AltSendme Empfangsticket...",
 		"howToReceive": "So empfangen Sie Dateien",
 		"instruction1": "Der Absender muss online sein und eine Datei freigeben",
 		"instruction2": "Holen Sie sich ein Ticket vom Absender",
@@ -112,7 +112,8 @@
 		"duration": "Dauer",
 		"avgSpeed": "Durchschnittsgeschwindigkeit",
 		"multipleFiles": "{{count}} Dateien",
-		"donatePrompt": "Mach es besser -"
+		"donatePrompt": "Machen Sie AltSendme besser durch ",
+		"donateLink": "Spenden"
 	},
 	"errors": {
 		"sharingFailed": "Freigabe fehlgeschlagen",

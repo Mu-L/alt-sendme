@@ -39,9 +39,12 @@ function findDebArtifacts() {
 function patchDeb(debPath) {
 	const tmpDir = fs.mkdtempSync(path.join('/tmp', 'altsendme-deb-'))
 	try {
-		execSync(`dpkg-deb -R ${JSON.stringify(debPath)} ${JSON.stringify(tmpDir)}`, {
-			stdio: 'pipe',
-		})
+		execSync(
+			`dpkg-deb -R ${JSON.stringify(debPath)} ${JSON.stringify(tmpDir)}`,
+			{
+				stdio: 'pipe',
+			}
+		)
 
 		const controlPath = path.join(tmpDir, 'DEBIAN', 'control')
 		const original = fs.readFileSync(controlPath, 'utf8')
@@ -59,9 +62,12 @@ function patchDeb(debPath) {
 		}
 
 		fs.writeFileSync(controlPath, patched)
-		execSync(`dpkg-deb -b ${JSON.stringify(tmpDir)} ${JSON.stringify(debPath)}`, {
-			stdio: 'pipe',
-		})
+		execSync(
+			`dpkg-deb -b ${JSON.stringify(tmpDir)} ${JSON.stringify(debPath)}`,
+			{
+				stdio: 'pipe',
+			}
+		)
 
 		console.log(`Patched ${debPath}`)
 		console.log(`  Depends: ${COMPATIBLE_DEPENDS}`)
@@ -87,9 +93,12 @@ function reuploadAsset(debPath) {
 		.trim()
 
 	if (assetId) {
-		execSync(`gh api --method DELETE "repos/${repo}/releases/assets/${assetId}"`, {
-			stdio: 'pipe',
-		})
+		execSync(
+			`gh api --method DELETE "repos/${repo}/releases/assets/${assetId}"`,
+			{
+				stdio: 'pipe',
+			}
+		)
 	}
 
 	execSync(

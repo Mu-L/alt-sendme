@@ -106,6 +106,7 @@ dependencies = [
  "gstreamer-video",
  "image",
  "iroh",
+ "iroh-blobs",
  "mime_guess",
  "n0-watcher",
  "objc",
@@ -1822,31 +1823,16 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 name = "engine"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "bytes",
  "clap",
  "console",
  "crossterm",
- "data-encoding",
- "derive_more 2.1.1",
- "dirs",
- "futures-buffered",
- "hex",
  "indicatif",
- "iroh",
- "iroh-blobs",
  "irpc",
  "libc",
- "n0-future",
- "num_cpus",
- "rand 0.10.1",
- "rustls-webpki",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
+ "sendme-native",
+ "sendme-protocol",
+ "sendme-wasm-io",
  "tracing-subscriber",
- "walkdir",
  "windows-sys 0.59.0",
 ]
 
@@ -6702,6 +6688,58 @@ name = "send_wrapper"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
+
+[[package]]
+name = "sendme-native"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "data-encoding",
+ "dirs",
+ "iroh",
+ "iroh-blobs",
+ "n0-future",
+ "num_cpus",
+ "rand 0.10.1",
+ "sendme-protocol",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
+name = "sendme-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "derive_more 2.1.1",
+ "getrandom 0.3.4",
+ "iroh",
+ "iroh-blobs",
+ "n0-future",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "web-time",
+]
+
+[[package]]
+name = "sendme-wasm-io"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "getrandom 0.3.4",
+ "iroh",
+ "iroh-blobs",
+ "n0-future",
+ "sendme-protocol",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "serde"

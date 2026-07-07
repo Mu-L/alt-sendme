@@ -18,6 +18,7 @@ async fn e2e_filename_conflict_resolved() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -25,6 +26,7 @@ async fn e2e_filename_conflict_resolved() {
             ..Default::default()
         },
         Some(receiver_emitter.clone()),
+        cancel_rx,
     )
     .await
     .expect("download should succeed even with conflict");
@@ -61,6 +63,7 @@ async fn e2e_original_file_preserved() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -68,6 +71,7 @@ async fn e2e_original_file_preserved() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");

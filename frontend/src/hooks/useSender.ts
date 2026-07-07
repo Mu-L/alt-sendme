@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { invoke, listen, type UnlistenFn } from '@/lib/platform-api'
-import { isWebPreviewError } from '@/lib/web-preview-error'
+import {
+	getWebPreviewErrorMessage,
+	isWebPreviewError,
+} from '@/lib/web-preview-error'
 import { useTranslation } from '../i18n/react-i18next-compat'
 import type { AlertType } from '../types/ui'
 import type { TransferMetadata, TransferProgress } from '../types/transfer'
@@ -218,9 +221,9 @@ export function useSender(): UseSenderReturn {
 						if (parts.length === 3) {
 							const bytesTransferred = parseInt(parts[0], 10)
 							const totalBytes = parseInt(parts[1], 10)
-							const speedRaw = Number.parseFloat(parts[2])
-							const speedBps = Number.isFinite(speedRaw)
-								? Math.max(speedRaw, 0)
+							const speedInt = parseInt(parts[2], 10)
+							const speedBps = Number.isFinite(speedInt)
+								? Math.max(speedInt / 1000, 0)
 								: 0
 							const percentage =
 								totalBytes > 0
@@ -650,7 +653,10 @@ export function useSender(): UseSenderReturn {
 			showAlert(
 				t('common:errors.sharingFailed'),
 				isWebPreviewError(error)
-					? t('common:webPreview.transferUnavailable')
+					? getWebPreviewErrorMessage(
+							error,
+							t('common:webPreview.transferUnavailable')
+						)
 					: `${t('common:errors.sharingFailedDesc')}: ${error}`,
 				'error'
 			)

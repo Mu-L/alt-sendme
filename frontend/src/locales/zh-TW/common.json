@@ -69,7 +69,7 @@
 		"noFolderSelected": "未選擇資料夾",
 		"conflictsMore": "... 等 {{count}} 項",
 		"pasteTicket": "在此處貼上票券：",
-		"ticketPlaceholder": "sendme 接收票券...",
+		"ticketPlaceholder": "AltSendme 接收票券...",
 		"howToReceive": "如何接收檔案",
 		"instruction1": "傳送者必須在線上並正在分享檔案",
 		"instruction2": "從傳送者處取得票券",
@@ -112,7 +112,9 @@
 		"duration": "持續時間",
 		"avgSpeed": "平均速度",
 		"multipleFiles": "{{count}} 個檔案",
-		"donatePrompt": "讓它變得更好 -"
+		"donatePrompt": "透過",
+		"donateLink": "捐贈",
+		"donateSuffix": "，讓 AltSendme 變得更好"
 	},
 	"errors": {
 		"sharingFailed": "分享失敗",

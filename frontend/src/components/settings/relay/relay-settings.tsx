@@ -3,6 +3,7 @@ import { invoke } from '@/lib/platform-api'
 import { AlertCircle, Check, Loader2, Minus, Plus } from 'lucide-react'
 import ReactCountryFlag from 'react-country-flag'
 import { useTranslation } from '../../../i18n'
+import { IS_WEB } from '../../../lib/platform'
 import { useAppSettingStore } from '../../../store/app-setting'
 import { relayAuthTokenForIpc } from '../../../lib/relay-auth-token'
 import {
@@ -82,7 +83,16 @@ export function RelaySettings() {
 		}
 	}, [relayUrls.length])
 
+	useEffect(() => {
+		if (IS_WEB && relayMode === 'disabled') {
+			setRelayMode('default')
+		}
+	}, [relayMode, setRelayMode])
+
 	const handleModeChange = (value: string) => {
+		if (IS_WEB && value === 'disabled') {
+			return
+		}
 		setRelayMode(value as 'default' | 'custom' | 'disabled')
 		if (value === 'custom' && relayUrls.length === 0) {
 			setRelayUrls([''])
@@ -291,21 +301,23 @@ export function RelaySettings() {
 						</div>
 					</button>
 
-					<button
-						type="button"
-						onClick={() => handleModeChange('disabled')}
-						className="flex cursor-pointer items-start gap-3 text-left"
-					>
-						<RadioGroupItem value="disabled" className="mt-0.5" />
-						<div>
-							<div className="text-sm font-medium">
-								{t('settings.network.relay.modeDisabled')}
+					{!IS_WEB && (
+						<button
+							type="button"
+							onClick={() => handleModeChange('disabled')}
+							className="flex cursor-pointer items-start gap-3 text-left"
+						>
+							<RadioGroupItem value="disabled" className="mt-0.5" />
+							<div>
+								<div className="text-sm font-medium">
+									{t('settings.network.relay.modeDisabled')}
+								</div>
+								<div className="text-sm text-muted-foreground">
+									{t('settings.network.relay.modeDisabledDesc')}
+								</div>
 							</div>
-							<div className="text-sm text-muted-foreground">
-								{t('settings.network.relay.modeDisabledDesc')}
-							</div>
-						</div>
-					</button>
+						</button>
+					)}
 				</RadioGroup>
 
 				{relayMode === 'custom' && (

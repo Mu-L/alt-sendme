@@ -1,4 +1,14 @@
-import { downloadDir, invoke, joinPath, listen, openDialog, revealItemInDir, type UnlistenFn } from '@/lib/platform-api'
+import {
+	downloadDir,
+	invoke,
+	joinPath,
+	listen,
+	openDialog,
+	pickDownloadDirectory,
+	revealItemInDir,
+	supportsWebSaveLocationPicker,
+	type UnlistenFn,
+} from '@/lib/platform-api'
 import { selectDownloadFolder } from '@/plugins/nativeUtils'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '../i18n/react-i18next-compat'
@@ -10,8 +20,11 @@ import type {
 	TransferProgress,
 } from '../types/transfer'
 import { SpeedAverager, calculateETA } from '../utils/etaUtils'
-import { IS_ANDROID } from '@/lib/platform'
-import { isWebPreviewError } from '@/lib/web-preview-error'
+import { IS_ANDROID, IS_WEB } from '@/lib/platform'
+import {
+	getWebPreviewErrorMessage,
+	isWebPreviewError,
+} from '@/lib/web-preview-error'
 import { getRelayConfigArg } from '../lib/relay'
 import { useAppSettingStore } from '@/store/app-setting'
 
@@ -122,6 +135,10 @@ export function useReceiver(): UseReceiverReturn {
 	const previewRequestSeqRef = useRef(0)
 	const previewMetadataRef = useRef<TicketPreviewMetadata | null>(null)
 	const transferItemCountRef = useRef<number | undefined>(undefined)
+	// Incremented each time a new transfer starts or is cancelled. Event listeners
+	// capture this value and ignore events whose seq no longer matches — preventing
+	// ghost completions from a just-cancelled download.
+	const transferSeqRef = useRef(0)
 
 	const resolveRevealPath = async (basePath: string, names: string[]) => {
 		if (!basePath) return null
@@ -299,6 +316,7 @@ export function useReceiver(): UseReceiverReturn {
 
 		const setupListeners = async () => {
 			await registerListener('receive-started', () => {
+				if (transferSeqRef.current === 0) return
 				setIsTransporting(true)
 				setIsCompleted(false)
 				setTransferStartTime(Date.now())
@@ -307,6 +325,7 @@ export function useReceiver(): UseReceiverReturn {
 			})
 
 			await registerListener('receive-progress', (event: any) => {
+				if (transferSeqRef.current === 0) return
 				try {
 					const payload = event.payload as string
 					const parts = payload.split(':')
@@ -341,6 +360,7 @@ export function useReceiver(): UseReceiverReturn {
 			})
 
 			await registerListener('receive-file-names', (event: any) => {
+				if (transferSeqRef.current === 0) return
 				try {
 					const payload = event.payload as string
 					const names = JSON.parse(payload) as string[]
@@ -353,6 +373,7 @@ export function useReceiver(): UseReceiverReturn {
 			})
 
 			await registerListener('receive-conflicts', (event: any) => {
+				if (transferSeqRef.current === 0) return
 				try {
 					const payload = event.payload as string
 					const conflicts = JSON.parse(payload) as Array<{
@@ -381,6 +402,7 @@ export function useReceiver(): UseReceiverReturn {
 			})
 
 			await registerListener('receive-completed', () => {
+				if (transferSeqRef.current === 0) return
 				setIsTransporting(false)
 				setIsCompleted(true)
 				setTransferProgress(null)
@@ -481,6 +503,11 @@ export function useReceiver(): UseReceiverReturn {
 				if (!response) return
 				selected = response.path
 				setDownloadsPath(selected)
+			} else if (IS_WEB) {
+				if (!supportsWebSaveLocationPicker()) {
+					return
+				}
+				selected = await pickDownloadDirectory()
 			} else {
 				const dialogSelection = await openDialog({
 					multiple: false,
@@ -510,6 +537,7 @@ export function useReceiver(): UseReceiverReturn {
 		try {
 			transferItemCountRef.current = previewMetadata?.itemCount
 			previewRequestSeqRef.current += 1
+			transferSeqRef.current += 1
 			setIsReceiving(true)
 			setIsTransporting(false)
 			setIsCompleted(false)
@@ -527,11 +555,23 @@ export function useReceiver(): UseReceiverReturn {
 				relay: getRelayConfigArg(),
 			})
 		} catch (error) {
+			// "cancelled" is the exact string the backend returns for user-initiated stops.
+			// Check for the exact Tauri-wrapped form so we don't accidentally swallow
+			// unrelated errors whose messages happen to contain the word.
+			if (
+				String(error) === 'cancelled' ||
+				String(error).endsWith(': cancelled')
+			)
+				return
+
 			console.error('Failed to receive file:', error)
 			showAlert(
 				t('common:errors.receiveFailed'),
 				isWebPreviewError(error)
-					? t('common:webPreview.transferUnavailable')
+					? getWebPreviewErrorMessage(
+							error,
+							t('common:webPreview.transferUnavailable')
+						)
 					: String(error),
 				'error'
 			)
@@ -542,7 +582,13 @@ export function useReceiver(): UseReceiverReturn {
 	}
 
 	const resetForNewTransfer = async () => {
+		// Zero the seq first so in-flight events from the cancelled transfer are ignored.
+		transferSeqRef.current = 0
 		previewRequestSeqRef.current += 1
+
+		// Tell the backend to cancel the active download (idempotent if none active).
+		invoke('cancel_receive').catch(() => {})
+
 		setIsReceiving(false)
 		setIsTransporting(false)
 		setIsCompleted(false)
@@ -559,7 +605,7 @@ export function useReceiver(): UseReceiverReturn {
 	}
 
 	const handleOpenFolder = async () => {
-		if (!savePath || folderOpenTriggeredRef.current) {
+		if (IS_WEB || !savePath || folderOpenTriggeredRef.current) {
 			return
 		}
 

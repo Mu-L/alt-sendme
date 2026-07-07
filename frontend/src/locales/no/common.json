@@ -69,7 +69,7 @@
 		"noFolderSelected": "Ingen mappe valgt",
 		"conflictsMore": "... og {{count}} til",
 		"pasteTicket": "Lim inn nøkkelen her:",
-		"ticketPlaceholder": "sendme overføringssnøkkel...",
+		"ticketPlaceholder": "AltSendme overføringssnøkkel...",
 		"howToReceive": "Hvordan motta filer",
 		"instruction1": "Avsender må være pålogget og dele en fil",
 		"instruction2": "Få en nøkkel fra avsenderen",
@@ -112,7 +112,8 @@
 		"duration": "Varighet",
 		"avgSpeed": "Gjennomsnittlig hastighet",
 		"multipleFiles": "{{count}} filer",
-		"donatePrompt": "Gjør det bedre -"
+		"donatePrompt": "Gjør AltSendme bedre ved å ",
+		"donateLink": "donere"
 	},
 	"errors": {
 		"sharingFailed": "Deling feilet",

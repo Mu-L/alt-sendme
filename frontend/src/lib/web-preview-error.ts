@@ -10,3 +10,14 @@ export class WebPreviewError extends Error {
 export function isWebPreviewError(error: unknown): boolean {
 	return error instanceof WebPreviewError
 }
+
+export function getWebPreviewErrorMessage(
+	error: unknown,
+	fallback: string
+): string {
+	if (error instanceof WebPreviewError) {
+		const message = error.message?.trim()
+		return message.length > 0 ? message : fallback
+	}
+	return fallback
+}

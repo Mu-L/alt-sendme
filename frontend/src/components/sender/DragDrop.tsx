@@ -44,6 +44,7 @@ export function DragDrop({
 		browseFolder,
 		closeAlert,
 		checkPathType,
+		dropzoneDragProps,
 	} = useDragDrop(onFileSelect, onFilesSelect)
 
 	useEffect(() => {
@@ -66,6 +67,7 @@ export function DragDrop({
 				onAddFolders={addMoreFolders}
 				onRemoveSelectedPath={onRemoveSelectedPath}
 				onClearSelection={onClearSelection}
+				dropzoneDragProps={dropzoneDragProps}
 			/>
 
 			{!selectedPath && (

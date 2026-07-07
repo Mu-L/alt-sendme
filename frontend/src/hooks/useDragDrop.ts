@@ -1,9 +1,10 @@
 import { getCurrentWindow, invoke, openDialog } from '@/lib/platform-api'
+import { processWebDataTransfer } from '@/lib/web-drag-drop'
 import { selectSendDocument, selectSendFolder } from '@/plugins/nativeUtils'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import { useTranslation } from '../i18n/react-i18next-compat'
 import type { AlertDialogState, AlertType } from '../types/ui'
-import { IS_ANDROID, IS_TAURI } from '@/lib/platform'
+import { IS_ANDROID, IS_TAURI, IS_WEB } from '@/lib/platform'
 
 export interface UseDragDropReturn {
 	isDragActive: boolean
@@ -29,6 +30,12 @@ export interface UseDragDropReturn {
 		path: string,
 		pathType?: 'file' | 'directory'
 	) => Promise<void>
+	dropzoneDragProps?: {
+		onDragEnter: (event: DragEvent<HTMLElement>) => void
+		onDragOver: (event: DragEvent<HTMLElement>) => void
+		onDragLeave: (event: DragEvent<HTMLElement>) => void
+		onDrop: (event: DragEvent<HTMLElement>) => void
+	}
 }
 
 export function useDragDrop(
@@ -58,6 +65,7 @@ export function useDragDrop(
 	const [copyFileName, setCopyFileName] = useState('')
 	const [copyTotalBytes, setCopyTotalBytes] = useState('0')
 	const cancelRef = useRef<(() => Promise<void>) | null>(null)
+	const webDragDepthRef = useRef(0)
 
 	const showAlert = useCallback(
 		(title: string, description: string, type: AlertType = 'info') => {
@@ -248,6 +256,76 @@ export function useDragDrop(
 		}
 	}, [showAlert, t, triggerFilesSelect])
 
+	const handleWebDragEnter = useCallback((event: DragEvent<HTMLElement>) => {
+		event.preventDefault()
+		event.stopPropagation()
+		webDragDepthRef.current += 1
+		setIsDragActive(true)
+	}, [])
+
+	const handleWebDragOver = useCallback((event: DragEvent<HTMLElement>) => {
+		event.preventDefault()
+		event.stopPropagation()
+		event.dataTransfer.dropEffect = 'copy'
+	}, [])
+
+	const handleWebDragLeave = useCallback((event: DragEvent<HTMLElement>) => {
+		event.preventDefault()
+		event.stopPropagation()
+		webDragDepthRef.current = Math.max(0, webDragDepthRef.current - 1)
+		if (webDragDepthRef.current === 0) {
+			setIsDragActive(false)
+		}
+	}, [])
+
+	const handleWebDrop = useCallback(
+		async (event: DragEvent<HTMLElement>) => {
+			event.preventDefault()
+			event.stopPropagation()
+			webDragDepthRef.current = 0
+			setIsDragActive(false)
+
+			try {
+				const { paths, pathType } = await processWebDataTransfer(
+					event.dataTransfer
+				)
+				if (paths.length > 0) {
+					await triggerFilesSelect(paths, pathType)
+				}
+			} catch (error) {
+				console.error('Failed to handle dropped files:', error)
+				showAlert(
+					t('common:errors.fileDialogFailed'),
+					`${t('common:errors.fileDialogFailedDesc')}: ${error}`,
+					'error'
+				)
+			}
+		},
+		[showAlert, t, triggerFilesSelect]
+	)
+
+	// Prevent the browser from opening/navigating to files dropped outside the dropzone.
+	useEffect(() => {
+		if (!IS_WEB) {
+			return
+		}
+
+		const rejectWindowFileDrop = (event: globalThis.DragEvent) => {
+			if (!event.dataTransfer?.types.includes('Files')) {
+				return
+			}
+			event.preventDefault()
+		}
+
+		window.addEventListener('dragover', rejectWindowFileDrop, true)
+		window.addEventListener('drop', rejectWindowFileDrop, true)
+
+		return () => {
+			window.removeEventListener('dragover', rejectWindowFileDrop, true)
+			window.removeEventListener('drop', rejectWindowFileDrop, true)
+		}
+	}, [])
+
 	useEffect(() => {
 		if (!IS_TAURI) {
 			return
@@ -398,5 +476,13 @@ export function useDragDrop(
 		showAlert,
 		closeAlert,
 		checkPathType,
+		dropzoneDragProps: IS_WEB
+			? {
+					onDragEnter: handleWebDragEnter,
+					onDragOver: handleWebDragOver,
+					onDragLeave: handleWebDragLeave,
+					onDrop: handleWebDrop,
+				}
+			: undefined,
 	}
 }

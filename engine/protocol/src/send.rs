@@ -1,34 +1,17 @@
-use crate::core::types::{
-    apply_options, get_or_create_secret, AddrInfoOptions, AppHandle, AutoCleanupDir, FileMetadata,
-    SendOptions, SendResult,
-};
-use anyhow::{ensure, Context};
-use data_encoding::HEXLOWER;
-use iroh::endpoint::presets;
+use crate::time_compat::{sleep, timeout, Duration, Instant};
+use crate::types::{apply_options, AddrInfoOptions, AppHandle, FileMetadata};
 use iroh::protocol::{AcceptError, ProtocolHandler};
-use iroh::{address_lookup::pkarr::PkarrPublisher, endpoint::RelayMode, Endpoint};
-use iroh_blobs::api::blobs::AddProgressItem;
+use iroh::{endpoint::RelayMode, Endpoint};
 use iroh_blobs::{
-    api::{
-        blobs::{AddPathOptions, ImportMode},
-        Store, TempTag,
-    },
-    format::collection::Collection,
-    provider::events::{ConnectMode, EventMask, EventSender, RequestMode},
-    store::fs::FsStore,
+    api::TempTag,
+    provider::events::ProviderMessage,
     ticket::BlobTicket,
     BlobFormat, BlobsProtocol,
 };
-use n0_future::StreamExt;
-use n0_future::{task::AbortOnDropHandle, BufferedStreamExt};
-use rand::RngExt;
+use n0_future::{task::AbortOnDropHandle, StreamExt};
 use std::io::ErrorKind;
-use std::{
-    path::{Component, Path, PathBuf},
-    time::{Duration, Instant},
-};
-use tokio::{select, sync::mpsc};
-use walkdir::WalkDir;
+use std::path::PathBuf;
+use tokio::sync::mpsc;
 
 // To avoid encoding thumbnail into ticket causing excessively long tickets, we use a custom metadata protocol to
 // send metadata seprately from the file data. After the receive end sticks the ticket, a seprate connection will
@@ -46,7 +29,7 @@ impl ProtocolHandler for MetadataProtocol {
     /// It reads a metadata request marker (1 byte) from client, responds with a length-prefixed JSON metadata payload, and waits for the client to close the connection before finishing.
     async fn accept(&self, connection: iroh::endpoint::Connection) -> Result<(), AcceptError> {
         let (mut send_stream, mut recv_stream) =
-            match tokio::time::timeout(Duration::from_secs(30), connection.accept_bi()).await {
+            match timeout(Duration::from_secs(30), connection.accept_bi()).await {
                 Ok(Ok(streams)) => streams,
                 Ok(Err(err)) => return Err(err.into()),
                 Err(_) => {
@@ -58,7 +41,7 @@ impl ProtocolHandler for MetadataProtocol {
         tracing::info!("metadata protocol bi stream accepted");
 
         let mut req = [0u8; 1];
-        tokio::time::timeout(Duration::from_secs(10), recv_stream.read_exact(&mut req))
+        timeout(Duration::from_secs(10), recv_stream.read_exact(&mut req))
             .await
             .map_err(|_| {
                 AcceptError::from_err(std::io::Error::new(
@@ -96,7 +79,7 @@ impl ProtocolHandler for MetadataProtocol {
         let len_prefix = (meta_bytes.len() as u32).to_be_bytes();
 
         // Send 4 bytes of length prefix followed by the JSON metadata
-        tokio::time::timeout(Duration::from_secs(10), send_stream.write_all(&len_prefix))
+        timeout(Duration::from_secs(10), send_stream.write_all(&len_prefix))
             .await
             .map_err(|_| {
                 AcceptError::from_err(std::io::Error::new(
@@ -105,7 +88,7 @@ impl ProtocolHandler for MetadataProtocol {
                 ))
             })?
             .map_err(AcceptError::from_err)?;
-        tokio::time::timeout(Duration::from_secs(20), send_stream.write_all(&meta_bytes))
+        timeout(Duration::from_secs(20), send_stream.write_all(&meta_bytes))
             .await
             .map_err(|_| {
                 AcceptError::from_err(std::io::Error::new(
@@ -121,7 +104,7 @@ impl ProtocolHandler for MetadataProtocol {
         // This prevents tearing down the QUIC connection before the data buffers are flushed.
         // We give it 30s which is more than the client's read timeout.
         let mut eof_buf = [0u8; 1];
-        let _ = tokio::time::timeout(Duration::from_secs(30), recv_stream.read(&mut eof_buf)).await;
+        let _ = timeout(Duration::from_secs(30), recv_stream.read(&mut eof_buf)).await;
 
         tracing::info!(bytes = meta_bytes.len(), "metadata sent");
 
@@ -141,17 +124,26 @@ fn emit_progress_event(
     app_handle: &AppHandle,
     bytes_transferred: u64,
     total_size: u64,
-    speed: f64,
+    speed_bps: f64,
 ) {
     if let Some(handle) = app_handle {
         let event_name = "transfer-progress";
 
-        // Keep legacy payload format for frontend compatibility: "bytes:total:speed"
-        let payload = format!("{}:{}:{}", bytes_transferred, total_size, speed);
+        // Match receive-progress encoding: speed as fixed-point int (×1000).
+        let speed_int = (speed_bps * 1000.0) as i64;
+        let payload = format!("{}:{}:{}", bytes_transferred, total_size, speed_int);
         if let Err(e) = handle.emit_event_with_payload(event_name, &payload) {
             tracing::warn!("Failed to emit progress event: {}", e);
         }
     }
+}
+
+fn speed_bps_from_elapsed(transferred: u64, elapsed_secs: f64) -> f64 {
+    const MIN_ELAPSED_SECS: f64 = 0.1;
+    if elapsed_secs < MIN_ELAPSED_SECS {
+        return 0.0;
+    }
+    transferred as f64 / elapsed_secs
 }
 
 fn emit_active_connection_count(app_handle: &AppHandle, count: usize) {
@@ -165,314 +157,92 @@ fn emit_active_connection_count(app_handle: &AppHandle, count: usize) {
     }
 }
 
-/// Deprecated: `start_share_items` should be used instead which supports
-/// sharing multiple files/directories at once and provides better filename handling.
-///
-/// todo: Testing and cli should be migrated to `start_share_items`
-pub async fn start_share(
-    path: PathBuf,
-    options: SendOptions,
-    app_handle: AppHandle,
-    metadata: Option<FileMetadata>,
-) -> anyhow::Result<SendResult> {
-    start_share_items(vec![path], options, &app_handle, metadata).await
+/// Shared send orchestration after blobs are imported into the store.
+pub struct ShareSessionOutcome<S> {
+    pub ticket: String,
+    pub hash: String,
+    pub size: u64,
+    pub entry_type: String,
+    pub router: iroh::protocol::Router,
+    pub temp_tag: TempTag,
+    pub store: S,
+    pub progress_handle: AbortOnDropHandle<anyhow::Result<()>>,
+    pub cleanup_dir: Option<PathBuf>,
 }
 
-/// Starts sharing the provided paths (files or directories).
-/// If multiple paths are provided, they will be shared as a collection.
-pub async fn start_share_items(
-    paths: Vec<PathBuf>,
-    options: SendOptions,
-    app_handle: &AppHandle,
+pub async fn run_share_session<S>(
+    endpoint: Endpoint,
+    store: S,
+    blobs: BlobsProtocol,
+    temp_tag: TempTag,
+    size: u64,
     metadata: Option<FileMetadata>,
-) -> anyhow::Result<SendResult> {
-    ensure!(!paths.is_empty(), "no paths provided for sharing");
+    ticket_type: AddrInfoOptions,
+    app_handle: &AppHandle,
+    entry_type: String,
+    relay_mode: RelayMode,
+    cleanup_dir: Option<PathBuf>,
+    progress_rx: mpsc::Receiver<ProviderMessage>,
+) -> anyhow::Result<ShareSessionOutcome<S>>
+where
+    S: Send + Sync + 'static,
+{
+    let progress_handle = n0_future::task::spawn(show_provide_progress_with_logging(
+        progress_rx,
+        app_handle.clone(),
+        size,
+        entry_type.clone(),
+    ));
 
-    let secret_key = get_or_create_secret()?;
-    let relay_mode: RelayMode = options.relay_mode.clone().into();
-    let mut builder = Endpoint::builder(presets::N0)
-        .alpns(vec![iroh_blobs::ALPN.to_vec(), METADATA_ALPN.to_vec()])
-        .secret_key(secret_key)
-        .relay_mode(relay_mode.clone());
+    let router = iroh::protocol::Router::builder(endpoint)
+        .accept(iroh_blobs::ALPN, blobs)
+        .accept(METADATA_ALPN, MetadataProtocol { metadata })
+        .spawn();
 
-    if options.ticket_type == AddrInfoOptions::Id {
-        builder = builder.address_lookup(PkarrPublisher::n0_dns());
-    }
-    if let Some(addr) = options.magic_ipv4_addr {
-        builder = builder.bind_addr(addr)?;
-    }
-    if let Some(addr) = options.magic_ipv6_addr {
-        builder = builder.bind_addr(addr)?;
-    }
-
-    let suffix = rand::rng().random::<[u8; 16]>();
-    let temp_base = std::env::temp_dir();
-    let blobs_data_dir = temp_base.join(format!(".sendme-send-{}", HEXLOWER.encode(&suffix)));
-
-    let canonical_paths = canonicalize_input_paths(paths)?;
-
-    let blobs_data_dir2 = blobs_data_dir.clone();
-    let (progress_tx, progress_rx) = mpsc::channel(64);
-    let app_handle_clone = app_handle.clone();
-    let is_collection = canonical_paths.len() > 1;
-    let entry_type_for_progress = if is_collection {
-        "collection".to_string()
-    } else if canonical_paths[0].is_dir() {
-        "directory".to_string()
-    } else {
-        "file".to_string()
-    };
-    let entry_type = entry_type_for_progress.clone();
-
-    let setup = async move {
-        tokio::fs::create_dir_all(&blobs_data_dir2).await?;
-        let endpoint = builder.bind().await?;
-        let store = FsStore::load(&blobs_data_dir2).await?;
-
-        let blobs = BlobsProtocol::new(
-            &store,
-            Some(EventSender::new(
-                progress_tx,
-                EventMask {
-                    connected: ConnectMode::Notify,
-                    get: RequestMode::NotifyLog,
-                    ..EventMask::DEFAULT
-                },
-            )),
-        );
-
-        let import_result = import_paths(canonical_paths, blobs.store()).await?;
-        let (ref _temp_tag, size, ref _collection) = import_result;
-
-        let progress_handle = n0_future::task::spawn(show_provide_progress_with_logging(
-            progress_rx,
-            app_handle_clone,
-            size,
-            entry_type_for_progress,
-        ));
-
-        let router = iroh::protocol::Router::builder(endpoint)
-            .accept(iroh_blobs::ALPN, blobs.clone())
-            .accept(METADATA_ALPN, MetadataProtocol { metadata })
-            .spawn();
-
-        let ep = router.endpoint();
-        tokio::time::timeout(Duration::from_secs(30), async move {
-            if !matches!(relay_mode, RelayMode::Disabled) {
-                let _ = ep.online().await;
-            }
-        })
-        .await?;
-
-        anyhow::Ok((
-            router,
-            import_result,
-            blobs_data_dir2,
-            store,
-            progress_handle,
-        ))
-    };
-
-    let (router, (temp_tag, size, _collection), _blobs_data_dir, store, progress_handle) = select! {
-        x = setup => x?,
-        _ = tokio::signal::ctrl_c() => {
-            anyhow::bail!("Operation cancelled");
+    let ep = router.endpoint();
+    timeout(Duration::from_secs(30), async move {
+        if !matches!(relay_mode, RelayMode::Disabled) {
+            let _ = ep.online().await;
         }
-    };
+    })
+    .await?;
+
     let hash = temp_tag.hash();
 
     let mut addr = router.endpoint().addr();
-
-    apply_options(&mut addr, options.ticket_type);
+    apply_options(&mut addr, ticket_type);
 
     let ticket = BlobTicket::new(addr, hash, BlobFormat::HashSeq);
 
-    Ok(SendResult {
+    Ok(ShareSessionOutcome {
         ticket: ticket.to_string(),
         hash: hash.to_hex().to_string(),
         size,
-        entry_type: entry_type.to_string(),
+        entry_type,
         router,
         temp_tag,
-        blobs_data_dir: AutoCleanupDir::new(blobs_data_dir),
-        _progress_handle: AbortOnDropHandle::new(progress_handle),
-        _store: store,
+        store,
+        progress_handle: AbortOnDropHandle::new(progress_handle),
+        cleanup_dir,
     })
 }
 
-async fn import_paths(
-    paths: Vec<PathBuf>,
-    db: &Store,
-) -> anyhow::Result<(TempTag, u64, Collection)> {
-    use std::collections::BTreeMap;
+/// Range specs used by receivers before the main payload download (hash-seq + child sizes).
+fn is_sizes_probe_request(ranges: &iroh_blobs::protocol::ChunkRangesSeq) -> bool {
+    use iroh_blobs::protocol::{ChunkRanges, ChunkRangesExt, ChunkRangesSeq};
 
-    let mut entries: Vec<(String, TempTag, u64)> = Vec::new();
-    let mut name_seen: BTreeMap<String, usize> = BTreeMap::new();
-
-    for path in paths {
-        let stem = path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "item".to_string());
-
-        let import = collect_path_files(&path, &stem)?;
-        if import.is_empty() {
-            tracing::warn!("no valid files found in path {}, skipping", path.display());
-        }
-
-        let mut local = n0_future::stream::iter(import)
-            .map(|(name, file_path)| {
-                let db = db.clone();
-                async move {
-                    let import = db.add_path_with_opts(AddPathOptions {
-                        path: file_path,
-                        mode: ImportMode::TryReference,
-                        format: iroh_blobs::BlobFormat::Raw,
-                    });
-                    let mut stream = import.stream().await;
-                    let mut item_size = 0u64;
-                    let temp_tag = loop {
-                        let item = stream
-                            .next()
-                            .await
-                            .context("import stream ended without a tag")?;
-                        match item {
-                            AddProgressItem::Size(size) => item_size = size,
-                            AddProgressItem::Done(tt) => break tt,
-                            AddProgressItem::Error(cause) => {
-                                anyhow::bail!("error importing {}:{}", name, cause)
-                            }
-                            _ => {}
-                        }
-                    };
-                    anyhow::Ok((name, temp_tag, item_size))
-                }
-            })
-            .buffered_unordered(num_cpus::get())
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .collect::<anyhow::Result<Vec<_>>>()?;
-
-        for (name, tag, size) in local.drain(..) {
-            let final_name = dedup_name(&name, &mut name_seen);
-            entries.push((final_name, tag, size));
-        }
-    }
-
-    entries.sort_by(|a, b| a.0.cmp(&b.0));
-    ensure!(
-        !entries.is_empty(),
-        "no valid files found in provided paths"
-    );
-    let total_size = entries.iter().map(|(_, _, size)| *size).sum::<u64>();
-    let (collection, tags) = entries
-        .into_iter()
-        .map(|(name, tag, _)| ((name, tag.hash()), tag))
-        .unzip::<_, _, Collection, Vec<_>>();
-
-    let temp_tag = collection.clone().store(db).await?;
-    drop(tags);
-    Ok((temp_tag, total_size, collection))
+    ranges == &ChunkRangesSeq::verified_child_sizes()
+        || ranges
+            == &ChunkRangesSeq::from_ranges_infinite([ChunkRanges::all(), ChunkRanges::last_chunk()])
 }
 
-pub fn canonicalized_path_to_string(
-    path: impl AsRef<Path>,
-    must_be_relative: bool,
-) -> anyhow::Result<String> {
-    let mut path_str = String::new();
-    let parts = path
-        .as_ref()
-        .components()
-        .filter_map(|c| match c {
-            Component::Normal(x) => {
-                let c = match x.to_str() {
-                    Some(c) => c,
-                    None => return Some(Err(anyhow::anyhow!("invalid character in path"))),
-                };
-
-                if !c.contains('/') && !c.contains('\\') {
-                    Some(Ok(c))
-                } else {
-                    Some(Err(anyhow::anyhow!("invalid path component {:?}", c)))
-                }
-            }
-            Component::RootDir => {
-                if must_be_relative {
-                    Some(Err(anyhow::anyhow!("invalid path component {:?}", c)))
-                } else {
-                    path_str.push('/');
-                    None
-                }
-            }
-            _ => Some(Err(anyhow::anyhow!("invalid path component {:?}", c))),
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-    let parts = parts.join("/");
-    path_str.push_str(&parts);
-    Ok(path_str)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::Path;
-
-    #[cfg(unix)]
-    #[test]
-    fn canonicalized_path_rejects_backslash() {
-        let path = Path::new("system-systemd\\x2dcryptsetup.slice");
-        assert!(canonicalized_path_to_string(path, true).is_err());
+/// Only treat a request as the final payload transfer once nearly all bytes were sent.
+fn transfer_payload_complete(bytes_sent: u64, total_size: u64) -> bool {
+    if total_size == 0 {
+        return true;
     }
-
-    #[test]
-    fn canonicalized_path_accepts_normal() {
-        let result = canonicalized_path_to_string(Path::new("subdir/file.txt"), true);
-        assert_eq!(result.unwrap(), "subdir/file.txt");
-    }
-
-    #[test]
-    fn canonicalized_path_rejects_parent_traversal() {
-        assert!(canonicalized_path_to_string(Path::new("../etc/passwd"), true).is_err());
-    }
-
-    #[test]
-    fn canonicalized_path_rejects_absolute_when_relative() {
-        assert!(canonicalized_path_to_string(Path::new("/etc/passwd"), true).is_err());
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn import_skips_invalid_files() {
-        use tempfile::TempDir;
-
-        let td = TempDir::new().unwrap();
-        let dir = td.path().join("testdir");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("good.txt"), "hello").unwrap();
-        std::fs::write(dir.join(format!("bad{}file.txt", '\\')), "bad").unwrap();
-
-        let path = dir.canonicalize().unwrap();
-        let root = path.parent().unwrap();
-        let data_sources: Vec<(String, PathBuf)> = WalkDir::new(path.clone())
-            .into_iter()
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                if !entry.file_type().is_file() {
-                    return None;
-                }
-                let path = entry.into_path();
-                let relative = path.strip_prefix(root).ok()?;
-                canonicalized_path_to_string(relative, true)
-                    .ok()
-                    .map(|name| (name, path))
-            })
-            .collect();
-
-        assert_eq!(data_sources.len(), 1, "should skip file with backslash");
-        assert!(data_sources[0].0.contains("good.txt"));
-    }
+    // Size probes only fetch hash-seq headers and last chunks — far below payload size.
+    bytes_sent.saturating_mul(100) >= total_size.saturating_mul(95)
 }
 
 async fn show_provide_progress_with_logging(
@@ -522,10 +292,7 @@ async fn show_provide_progress_with_logging(
                     iroh_blobs::provider::events::ProviderMessage::ConnectionClosed(_msg) => {
                     }
                     iroh_blobs::provider::events::ProviderMessage::GetRequestReceivedNotify(msg) => {
-                        let is_sizes_probe_request =
-                            (entry_type == "directory" || entry_type == "collection")
-                                && msg.request.ranges
-                                    == iroh_blobs::protocol::ChunkRangesSeq::verified_child_sizes();
+                        let is_sizes_probe_request = is_sizes_probe_request(&msg.request.ranges);
 
                         let connection_id = msg.connection_id;
                         let request_id = msg.request_id;
@@ -545,6 +312,7 @@ async fn show_provide_progress_with_logging(
                         let has_emitted_completed_task = has_emitted_completed.clone();
                         let last_request_time_task = last_request_time.clone();
                         let entry_type_task = entry_type.clone();
+                        let total_collection_size_task = total_collection_size;
 
                         let mut rx = msg.rx;
                         tasks.push(async move {
@@ -664,11 +432,10 @@ async fn show_provide_progress_with_logging(
                                                 )
                                             })
                                         } {
-                                            let speed_bps = if elapsed > 0.0 {
-                                                transferred as f64 / elapsed
-                                            } else {
-                                                0.0
-                                            };
+                                            let speed_bps = speed_bps_from_elapsed(
+                                                transferred.min(total_size),
+                                                elapsed,
+                                            );
                                             emit_progress_event(
                                                 &app_handle_task,
                                                 transferred.min(total_size),
@@ -679,42 +446,53 @@ async fn show_provide_progress_with_logging(
                                     }
                                     iroh_blobs::provider::events::RequestUpdate::Completed(_m) => {
                                         if transfer_started && !request_completed {
-                                            {
+                                            let bytes_sent = {
                                                 let mut states = transfer_states_task.lock().await;
-                                                if let Some(state) = states.get_mut(&(connection_id, request_id)) {
+                                                if let Some(state) =
+                                                    states.get_mut(&(connection_id, request_id))
+                                                {
                                                     if !state.ignore_current_blob {
                                                         state.accounted_payload_bytes = state
                                                             .accounted_payload_bytes
                                                             .saturating_add(state.current_blob_size)
                                                             .min(state.total_size);
                                                     }
+                                                    Some(state.accounted_payload_bytes)
+                                                } else {
+                                                    None
                                                 }
-                                            }
+                                            };
 
                                             let active_count = {
                                                 let mut states = transfer_states_task.lock().await;
                                                 states.remove(&(connection_id, request_id));
-                                                let active_count = states.len();
-                                                active_count
+                                                states.len()
                                             };
 
                                             emit_active_connection_count(&app_handle_task, active_count);
 
                                             request_completed = true;
 
+                                            if !transfer_payload_complete(
+                                                bytes_sent.unwrap_or(0),
+                                                total_collection_size_task,
+                                            ) {
+                                                active_requests_task.fetch_sub(1, Ordering::SeqCst);
+                                                continue;
+                                            }
+
                                             let completed = completed_requests_task.fetch_add(1, Ordering::SeqCst) + 1;
                                             let active = active_requests_task.load(Ordering::SeqCst);
 
-                                            // The receiver makes a single execute_get request for the entire transfer.
-                                            // The size probe request is ignored above and does not increment active/completed.
-                                            // Therefore, a single completed request always indicates the end of the transfer.
+                                            // Size-probe requests are ignored above. A completed payload
+                                            // request with all bytes sent indicates the end of the transfer.
                                             let min_required = 1;
 
                                             if completed >= active
                                                 && completed >= min_required {
                                                 let active_before_wait = active;
 
-                                                tokio::time::sleep(Duration::from_millis(500)).await;
+                                                sleep(Duration::from_millis(500)).await;
 
                                                 let completed_after = completed_requests_task.load(Ordering::SeqCst);
                                                 let active_after = active_requests_task.load(Ordering::SeqCst);
@@ -775,19 +553,31 @@ async fn show_provide_progress_with_logging(
                             }
 
                             if transfer_started && !request_completed {
+                                let bytes_sent = {
+                                    let states = transfer_states_task.lock().await;
+                                    states
+                                        .get(&(connection_id, request_id))
+                                        .map(|state| state.accounted_payload_bytes)
+                                };
+
+                                if !transfer_payload_complete(
+                                    bytes_sent.unwrap_or(0),
+                                    total_collection_size_task,
+                                ) {
+                                    active_requests_task.fetch_sub(1, Ordering::SeqCst);
+                                    return;
+                                }
+
                                 let completed = completed_requests_task.fetch_add(1, Ordering::SeqCst) + 1;
                                 let active = active_requests_task.load(Ordering::SeqCst);
 
-                                // The receiver makes a single execute_get request for the entire transfer.
-                                // The size probe request is ignored above and does not increment active/completed.
-                                // Therefore, a single completed request always indicates the end of the transfer.
                                 let min_required = 1;
 
                                 if completed >= active
                                     && completed >= min_required {
                                     let active_before_wait = active;
 
-                                    tokio::time::sleep(Duration::from_millis(500)).await;
+                                    sleep(Duration::from_millis(500)).await;
 
                                     let completed_after = completed_requests_task.load(Ordering::SeqCst);
                                     let active_after = active_requests_task.load(Ordering::SeqCst);
@@ -837,9 +627,6 @@ async fn show_provide_progress_with_logging(
     let completed = completed_requests.load(Ordering::SeqCst);
     let active = active_requests.load(Ordering::SeqCst);
 
-    // The receiver makes a single execute_get request for the entire transfer.
-    // The size probe request is ignored above and does not increment active/completed.
-    // Therefore, a single completed request always indicates the end of the transfer.
     let min_required = 1;
 
     if completed >= active && completed >= min_required && completed > 0 {
@@ -851,70 +638,26 @@ async fn show_provide_progress_with_logging(
     Ok(())
 }
 
-fn canonicalize_input_paths(paths: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
-    use std::collections::BTreeSet;
-    let mut uniq = BTreeSet::new();
-    // introduce index to prevent leaking real paths in log
-    for (index, p) in paths.iter().enumerate() {
-        let c = p
-            .canonicalize()
-            .with_context(|| format!("failed to canonicalize path {}", index))?;
-        ensure!(c.exists(), "path {} does not exist", index);
-        uniq.insert(c);
-    }
-    let out: Vec<PathBuf> = uniq.into_iter().collect();
-    anyhow::ensure!(!out.is_empty(), "no valid paths provided");
-    Ok(out)
-}
+#[cfg(test)]
+mod tests {
+    use super::{is_sizes_probe_request, transfer_payload_complete};
+    use iroh_blobs::protocol::{ChunkRanges, ChunkRangesExt, ChunkRangesSeq};
 
-/// Duplicate name deduplication utility.
-///
-/// - Returns a name like "name (2)"
-fn dedup_name(name: &str, seen: &mut std::collections::BTreeMap<String, usize>) -> String {
-    match seen.get_mut(name) {
-        Some(count) => {
-            *count += 1;
-            format!("{} ({})", name, count)
-        }
-        None => {
-            seen.insert(name.to_string(), 1);
-            name.to_string()
-        }
-    }
-}
-
-/// Recursively collect files from a directory
-///
-/// - Returns a vac of (relative_path, absolute_path) tuples
-fn collect_path_files(path: &Path, root_name: &str) -> anyhow::Result<Vec<(String, PathBuf)>> {
-    if path.is_file() {
-        let rel = canonicalized_path_to_string(PathBuf::from(root_name), true)?;
-        return Ok(vec![(rel, path.to_path_buf())]);
+    #[test]
+    fn sizes_probe_detection() {
+        assert!(is_sizes_probe_request(&ChunkRangesSeq::verified_child_sizes()));
+        assert!(is_sizes_probe_request(&ChunkRangesSeq::from_ranges_infinite([
+            ChunkRanges::all(),
+            ChunkRanges::last_chunk(),
+        ])));
+        assert!(!is_sizes_probe_request(&ChunkRangesSeq::all()));
     }
 
-    if path.is_dir() {
-        let mut out = Vec::new();
-        for (index, entry) in WalkDir::new(path).into_iter().enumerate() {
-            let entry = match entry {
-                Ok(v) => v,
-                Err(_e) => {
-                    tracing::warn!("skipping inaccessible entry {}", index);
-                    continue;
-                }
-            };
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let file = entry.path().to_path_buf();
-            let rel = file
-                .strip_prefix(path)
-                .with_context(|| format!("strip_prefix failed for file {}", index))?;
-            let mut prefixed = PathBuf::from(root_name);
-            prefixed.push(rel);
-            let safe = canonicalized_path_to_string(prefixed, true)?;
-            out.push((safe, file));
-        }
-        return Ok(out);
+    #[test]
+    fn payload_complete_threshold() {
+        assert!(transfer_payload_complete(1000, 1000));
+        assert!(transfer_payload_complete(950, 1000));
+        assert!(!transfer_payload_complete(100, 1000));
+        assert!(transfer_payload_complete(0, 0));
     }
-    anyhow::bail!("path is neither file nor directory");
 }

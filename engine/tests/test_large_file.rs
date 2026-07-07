@@ -15,6 +15,7 @@ async fn e2e_large_file_integrity() {
 
     assert_eq!(share.size, 10_000_000);
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -22,6 +23,7 @@ async fn e2e_large_file_integrity() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -54,6 +56,7 @@ async fn e2e_progress_events_emitted() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -61,6 +64,7 @@ async fn e2e_progress_events_emitted() {
             ..Default::default()
         },
         Some(receiver_emitter.clone()),
+        cancel_rx,
     )
     .await
     .expect("download should succeed");

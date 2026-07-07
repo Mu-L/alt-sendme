@@ -81,6 +81,7 @@ pub fn run() {
             send_items,
             stop_sharing,
             receive_file,
+            cancel_receive,
             get_sharing_status,
             check_path_type,
             get_paths_mime_types,

@@ -21,6 +21,7 @@ async fn e2e_directory_roundtrip() {
 
     assert_eq!(share.entry_type, "directory");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -28,6 +29,7 @@ async fn e2e_directory_roundtrip() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -61,6 +63,7 @@ async fn e2e_directory_with_deep_nesting() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -68,6 +71,7 @@ async fn e2e_directory_with_deep_nesting() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");

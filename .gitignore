@@ -55,6 +55,9 @@ Thumbs.db
 *.log
 logs/
 
+.vercel/
+frontend/dist/.vercel/
+
 # Environment files
 .env
 .env.local

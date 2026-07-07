@@ -69,7 +69,7 @@
 		"noFolderSelected": "कोई फ़ोल्डर चयनित नहीं",
 		"conflictsMore": "... और {{count}} और",
 		"pasteTicket": "टिकट यहाँ पेस्ट करें:",
-		"ticketPlaceholder": "sendme प्राप्ति टिकट...",
+		"ticketPlaceholder": "AltSendme प्राप्ति टिकट...",
 		"howToReceive": "फ़ाइलें कैसे प्राप्त करें",
 		"instruction1": "प्रेषक ऑनलाइन होना चाहिए और फ़ाइल साझा कर रहा होना चाहिए",
 		"instruction2": "प्रेषक से टिकट प्राप्त करें",
@@ -112,7 +112,8 @@
 		"duration": "अवधि",
 		"avgSpeed": "औसत गति",
 		"multipleFiles": "{{count}} फ़ाइलें",
-		"donatePrompt": "इसे बेहतर बनाएं -"
+		"donatePrompt": "AltSendme को बेहतर बनाने के लिए ",
+		"donateLink": "दान करें"
 	},
 	"errors": {
 		"sharingFailed": "साझा करना विफल",

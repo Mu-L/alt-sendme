@@ -69,7 +69,7 @@
 		"noFolderSelected": "Není vybrána žádná složka",
 		"conflictsMore": "... a dalších {{count}}",
 		"pasteTicket": "Sem vložte ticket:",
-		"ticketPlaceholder": "sendme ticket pro příjem...",
+		"ticketPlaceholder": "AltSendme ticket pro příjem...",
 		"howToReceive": "Jak přijmout soubory",
 		"instruction1": "Odesílatel musí být online a sdílet soubor",
 		"instruction2": "Získejte ticket od odesílatele",
@@ -112,7 +112,8 @@
 		"duration": "Doba trvání",
 		"avgSpeed": "Průměrná rychlost",
 		"multipleFiles": "{{count}} souborů",
-		"donatePrompt": "Vylepšete to -"
+		"donatePrompt": "Zlepšete AltSendme ",
+		"donateLink": "přispěním"
 	},
 	"errors": {
 		"sharingFailed": "Sdílení selhalo",

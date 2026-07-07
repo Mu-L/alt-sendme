@@ -24,6 +24,7 @@ async fn e2e_single_text_file_roundtrip() {
     assert_eq!(share.entry_type, "file");
 
     let receiver_emitter = MockEventEmitter::new();
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     let result = download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -31,6 +32,7 @@ async fn e2e_single_text_file_roundtrip() {
             ..Default::default()
         },
         Some(receiver_emitter.clone()),
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -66,6 +68,7 @@ async fn e2e_binary_file_roundtrip() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -73,6 +76,7 @@ async fn e2e_binary_file_roundtrip() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -94,6 +98,7 @@ async fn e2e_empty_file_roundtrip() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -101,6 +106,7 @@ async fn e2e_empty_file_roundtrip() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");

@@ -17,8 +17,7 @@ type InputPropsRejectPreviousUnsafePublicShape = Assert<
 	PreviousPublicInputProps extends InputProps ? false : true
 >
 
-export const inputPropsSafetyBoundaryCheck: InputPropsRejectPreviousUnsafePublicShape =
-	true
+export const inputPropsSafetyBoundaryCheck: InputPropsRejectPreviousUnsafePublicShape = true
 
 export function InputAcceptsRuntimeNativeBoolean({
 	isNative,

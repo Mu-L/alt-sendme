@@ -1,4 +1,5 @@
 import { relayAuthTokenForIpc } from './relay-auth-token.js'
+import { IS_WEB } from './platform.js'
 
 export type RelayMode = 'default' | 'custom' | 'disabled'
 export type RelayFallback = 'strict' | 'public'
@@ -17,20 +18,26 @@ export type RelayConfigInput = {
 	relayFallback: RelayFallback
 }
 
+/** Browser transfers require relays; desktop-only "disabled" mode is not offered on web. */
+export function effectiveRelayMode(relayMode: RelayMode): RelayMode {
+	return IS_WEB && relayMode === 'disabled' ? 'default' : relayMode
+}
+
 export function buildRelayConfigArg({
 	relayMode,
 	relayUrls,
 	relayAuthToken,
 	relayFallback,
 }: RelayConfigInput): RelayConfigArg {
+	const mode = effectiveRelayMode(relayMode)
+
 	return {
-		mode: relayMode,
+		mode,
 		urls:
-			relayMode === 'custom'
+			mode === 'custom'
 				? relayUrls.map((url) => url.trim()).filter(Boolean)
 				: [],
-		auth_token:
-			relayMode === 'custom' ? relayAuthTokenForIpc(relayAuthToken) : null,
+		auth_token: mode === 'custom' ? relayAuthTokenForIpc(relayAuthToken) : null,
 		fallback: relayFallback,
 	}
 }

@@ -1,160 +1,97 @@
 # Contributing to AltSendme
 
-Thank you for your interest in contributing to AltSendme! Your help is appreciated in making file sharing frictionless, fast, and private for everyone.
+Thank you for your interest in contributing. This guide covers local setup and how to submit changes.
 
-## Join our [Discord](https://discord.gg/xwb7z22Eve)
+## Development setup
 
-The best way to get started is to join our Discord and say hi. Introduce yourself and share what skills or interests you have - whether that’s coding, testing, design, or something else. You can also raise issues, suggest fixes, or pitch ideas. Maintainers are there to guide you every step of the way.
+**Prerequisites:** Rust 1.91+, Node.js 20+, pnpm 10+
 
+```bash
+git clone https://github.com/tonyantony300/alt-sendme.git
+cd alt-sendme
+pnpm install
+```
+
+### Desktop
+
+```bash
+pnpm tauri dev
+```
+
+Production build (skips installer/bundle packaging):
+
+```bash
+pnpm tauri build --no-bundle
+```
+
+### Web app setup
+
+Use the web target to run the app in a browser during development.
+
+Start the web dev server:
+
+```bash
+pnpm build:wasm   
+pnpm dev:web
+```
+
+Open `http://localhost:3000/`.
+
+Production web build:
+
+```bash
+pnpm build:web
+pnpm preview:web
+```
+
+### Android
+
+```bash
+pnpm android:dev
+```
+
+### Project layout
+
+| Path | Purpose |
+|------|---------|
+| `frontend/` | React UI (Tauri + web targets) |
+| `src-tauri/` | Tauri desktop/Android shell |
+| `engine/` | Rust P2P transfer engine |
+| `www/` | Public Next.js site (planned) |
 
 ## Testing
 
-Install [Sendme CLI](https://www.iroh.computer/sendme) tool and you can share files within same device to test the whole transfer process. Files don't leave your device just works like a copy operation.
+To exercise transfers on a single machine, install the [Sendme CLI](https://www.iroh.computer/sendme) and share files locally — traffic stays on your device.
 
-## How You Can Help
-
-This project welcomes contributions in several key areas:
-
-### Real-World Testing & Bug Reports
-
-One of the most valuable contributions is testing AltSendme in real-world scenarios and reporting any issues encountered. This project is particularly interested in:
-
-- File transfer issues across different networks (home networks, corporate networks, VPNs, etc.)
-- Edge cases with different file types and sizes
-- Cross-platform compatibility issues
-- Performance problems or unexpected behavior
-- NAT traversal and connectivity challenges
-
-**To report issues:**
-1. Check if the issue already exists in our [Issues](https://github.com/tonyantony300/alt-sendme/issues) section
-2. If not, create a new issue with:
-   - A clear description of the problem
-   - Steps to reproduce
-   - Your operating system and AltSendme version
-   - Network environment (if relevant)
-   - Expected vs. actual behavior
-
-### Rust Code Contributions
-
-This project is always looking for help improving the Rust codebase! Whether you're:
-
-- A seasoned Rust developer looking to optimize performance
-- Someone who wants to fix bugs or add features
-- A learner wanting to contribute while improving your Rust skills
-
-**All contributions are welcome!** Areas where you can help include:
-
-- Code refactoring and cleanup
-- Core file transfer logic
-- Tauri backend improvements
-- Error handling and edge cases
-- Performance optimizations
-- Documentation improvements
-- Unit and integration tests
-
-Please refer to the [Development](#development-setup) section below for setup instructions.
-
-### Mobile Development
-
-This project needs help porting AltSendme to mobile platforms using **Tauri's mobile capabilities**. 
-
-Since Tauri is cross-platform and supports mobile development, contributors with experience in:
-
-- **Tauri mobile development** (iOS/Android)
-- Rust mobile integration
-- Cross-platform mobile development with Tauri
-- Mobile UI/UX adaptation
-
-...would be especially valuable. Mobile development is in the early planning stages, so there's lots of room for input on architecture and approach.
-
-### Spread the Word
-
-One of the simplest yet most impactful ways to contribute is through word of mouth! Help more people discover AltSendme by:
-
-- Sharing the project with friends, colleagues, and communities
-- Posting about it on social media, forums, or tech communities
-- Writing blog posts or creating tutorials about your experience
-- Mentioning it when someone needs a file transfer solution
-- Starring the repository on GitHub to increase visibility
-
-
-## Getting in Touch
-
-Have ideas you want to discuss? Want to collaborate on a major feature? Need guidance on where to start?
-
-**Join our Discord:** [Discord](https://discord.gg/xwb7z22Eve)
-
-Feel free to reach out with questions, ideas, or just to say hello. Discussion about the project, guidance, and collaboration to make AltSendme better are always welcome!
-
-## Development Setup
-
-### Prerequisites
-
-- Rust 1.91+
-- Node.js 18+
-- npm or yarn
-
-### Getting Started
-
-1. **Fork and clone the repository**:
-   ```bash
-   git clone https://github.com/your-username/alt-sendme.git
-   cd alt-sendme
-   ```
-
-2. **Install frontend dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Install Tauri**:
-   ```bash
-   cargo install tauri-cli
-
-4. **Run in development mode**:
-   ```bash
-   cargo tauri dev
-   ```
-
-5. **Build locally** :
-   ```bash
-    cargo tauri build --no-bundle
-   ```
-
-
-This will start the app with hot reload enabled for both frontend and backend changes.
-
-### Before Submitting a Pull Request
-
-- Ensure your code follows industry standards
-- Builds without errors
-- Test your changes thoroughly
-- Document everything properly in PR
-- Write clear commit messages
-
-**Do not commit lockfile-only changes.** Only change lockfiles when you have intentionally added or updated dependencies in the corresponding manifest. Lockfile-only changes inflate PR size and are rejected by CI.
-
-- **`package-lock.json`** — only when you changed `package.json` (e.g. after `npm install` with no dependency changes, discard the lockfile).
-- **`Cargo.lock`** — only when you changed `Cargo.toml` in `src-tauri/` or `engine/` (e.g. after `cargo build` with no dependency changes, discard the lockfile).
-
-To discard accidental lockfile changes before committing:
+Engine E2E tests:
 
 ```bash
-git checkout origin/main -- package-lock.json src-tauri/Cargo.lock engine/Cargo.lock
+cargo test --manifest-path engine/Cargo.toml
 ```
 
+## Pull requests
 
-## Code of Conduct
+1. Search [existing issues](https://github.com/tonyantony300/alt-sendme/issues) before opening a new one.
+2. For bugs, use the [bug report template](.github/ISSUE_TEMPLATE/report-bug.md).
+3. Run checks before opening a PR:
 
-Please be respectful and considerate in all interactions. The goal is to maintain a welcoming and inclusive environment for everyone.
+```bash
+pnpm lint
+pnpm format
+```
 
-## Questions?
+4. Fill out the [pull request template](.github/PULL_REQUEST_TEMPLATE.md).
 
-Don't hesitate to ask questions! You can:
-- Open an issue for discussion
-- Join our [discord](https://discord.gg/xwb7z22Eve) to hang out, ask questions, and discuss ideas
-- Comment on existing issues or pull requests
+**Lockfiles:** Do not commit lockfile-only changes. CI rejects PRs that modify `pnpm-lock.yaml` or `Cargo.lock` without a corresponding manifest change.
 
-Thank you for making AltSendme better! Every contribution, no matter how small, is greatly appreciated. 💚
+```bash
+git checkout origin/main -- pnpm-lock.yaml src-tauri/Cargo.lock engine/Cargo.lock
+```
+
+## Getting help
+
+- [Discord](https://discord.gg/xwb7z22Eve)
+- [GitHub Issues](https://github.com/tonyantony300/alt-sendme/issues)
 
 
+Please be respectful and considerate in all project spaces.

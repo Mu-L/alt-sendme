@@ -69,7 +69,7 @@
 		"noFolderSelected": "មិនបានជ្រើសថតទេ",
 		"conflictsMore": "... និង {{count}} ទៀត",
 		"pasteTicket": "បិទភ្ជាប់សំបុត្រនៅទីនេះ៖",
-		"ticketPlaceholder": "sendme receive ticket...",
+		"ticketPlaceholder": "AltSendme receive ticket...",
 		"howToReceive": "របៀបទទួលឯកសារ",
 		"instruction1": "អ្នកផ្ញើត្រូវតែតភ្ជាប់អ៊ីនធឺណិត និងកំពុងចែកឯកសារ",
 		"instruction2": "ទទួលសំបុត្រពីអ្នកផ្ញើ",
@@ -112,7 +112,8 @@
 		"duration": "រយៈពេល",
 		"avgSpeed": "ល្បឿនមធ្យម",
 		"multipleFiles": "{{count}} ឯកសារ",
-		"donatePrompt": "ធ្វើឱ្យវាប្រសើរឡើង -"
+		"donatePrompt": "ធ្វើឱ្យ AltSendme ប្រសើរឡើងដោយ ",
+		"donateLink": "បរិច្ចាគ"
 	},
 	"errors": {
 		"sharingFailed": "ការចែករំលែកបរាជ័យ",

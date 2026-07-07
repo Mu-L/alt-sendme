@@ -69,7 +69,7 @@
 		"noFolderSelected": "কোনো ফোল্ডার নির্বাচন করা হয়নি",
 		"conflictsMore": "... এবং আরও {{count}}",
 		"pasteTicket": "এখানে টিকিটটি পেস্ট করুন:",
-		"ticketPlaceholder": "sendme টিকিট পেয়েছে...",
+		"ticketPlaceholder": "AltSendme টিকিট পেয়েছে...",
 		"howToReceive": "ফাইল গ্রহণ করার পদ্ধতি",
 		"instruction1": "প্রেরক অনলাইনে থাকা অবস্থায় ফাইল শেয়ার করতে হবে",
 		"instruction2": "প্রেরকের কাছ থেকে একটি টিকিট নিন",
@@ -112,7 +112,8 @@
 		"duration": "সময়কাল",
 		"avgSpeed": "গড় গতি",
 		"multipleFiles": "{{count}}টি ফাইল",
-		"donatePrompt": "এটিকে আরও ভালো করুন -"
+		"donatePrompt": "AltSendmeকে আরও ভালো করতে ",
+		"donateLink": "অনুদান দিয়ে"
 	},
 	"errors": {
 		"sharingFailed": "শেয়ার ব্যর্থ হয়েছে",

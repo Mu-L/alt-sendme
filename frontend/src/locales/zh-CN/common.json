@@ -69,7 +69,7 @@
 		"noFolderSelected": "未选择文件夹",
 		"conflictsMore": "... 等 {{count}} 项",
 		"pasteTicket": "在此处粘贴票据：",
-		"ticketPlaceholder": "sendme 接收票据...",
+		"ticketPlaceholder": "AltSendme 接收票据...",
 		"howToReceive": "如何接收文件",
 		"instruction1": "发送者必须在线并正在共享文件",
 		"instruction2": "从发送者处获取票据",
@@ -112,7 +112,9 @@
 		"duration": "持续时间",
 		"avgSpeed": "平均速度",
 		"multipleFiles": "{{count}} 个文件",
-		"donatePrompt": "让它变得更好 -"
+		"donatePrompt": "通过",
+		"donateLink": "捐赠",
+		"donateSuffix": "，让 AltSendme 变得更好"
 	},
 	"errors": {
 		"sharingFailed": "共享失败",

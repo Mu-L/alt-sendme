@@ -101,7 +101,8 @@ async fn e2e_receiver_temp_dir_preserved_on_failure() {
     options.output_dir = Some(recv_dir);
 
     // The download should fail because the sender is gone
-    let result = download(ticket, options, None).await;
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
+    let result = download(ticket, options, None, cancel_rx).await;
     assert!(
         result.is_err(),
         "Download should fail since sender was dropped"
@@ -128,6 +129,7 @@ async fn e2e_receiver_temp_dir_removed_on_success() {
     let ticket = share.ticket.clone();
     let expected_path = receiver_temp_dir(&ticket);
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     let result = download(
         ticket,
         ReceiveOptions {
@@ -135,6 +137,7 @@ async fn e2e_receiver_temp_dir_removed_on_success() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -150,6 +153,113 @@ async fn e2e_receiver_temp_dir_removed_on_success() {
     assert!(
         wait_until_gone(&expected_path).await,
         "Receiver temp dir should be removed after a successful download"
+    );
+
+    drop(share);
+}
+
+/// Cancelling via the cancel channel preserves the partial store so the same
+/// ticket can be resumed in the same session.
+#[tokio::test]
+async fn e2e_cancel_preserves_partial_store() {
+    let fixture = TestFixture::new();
+    let source = fixture.create_file("cancel_test.txt", b"content to be cancelled");
+
+    let share = start_share(source, SendOptions::default(), None, None)
+        .await
+        .unwrap();
+    let ticket = share.ticket.clone();
+    let expected_path = receiver_temp_dir(&ticket);
+    let _ = std::fs::remove_dir_all(&expected_path); // start clean
+
+    // Send cancel immediately — the store is created before the select! runs,
+    // so the partial dir will exist regardless of how fast the cancel fires.
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    cancel_tx.send(()).unwrap();
+
+    let result = download(
+        ticket.clone(),
+        ReceiveOptions {
+            output_dir: Some(fixture.output_dir()),
+            ..Default::default()
+        },
+        None,
+        cancel_rx,
+    )
+    .await;
+
+    assert!(result.is_err(), "cancelled download should return an error");
+    assert!(
+        result.unwrap_err().to_string().contains("cancelled"),
+        "error message should indicate cancellation"
+    );
+
+    // Partial store must survive so the user can resume by re-entering the same ticket.
+    assert!(
+        expected_path.exists(),
+        "partial recv store should be preserved after cancel for same-session resume"
+    );
+
+    let _ = std::fs::remove_dir_all(&expected_path);
+    drop(share);
+}
+
+/// After a cancel, resuming with the same ticket completes the transfer successfully.
+#[tokio::test]
+async fn e2e_same_ticket_resumes_after_cancel() {
+    let fixture = TestFixture::new();
+    let source = fixture.create_file("resume.txt", b"resume after cancel content");
+    let recv_dir = fixture.output_dir();
+
+    let share = start_share(source, SendOptions::default(), None, None)
+        .await
+        .unwrap();
+    let ticket = share.ticket.clone();
+    let partial_path = receiver_temp_dir(&ticket);
+    let _ = std::fs::remove_dir_all(&partial_path);
+
+    // First attempt: cancel immediately.
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    cancel_tx.send(()).unwrap();
+    let _ = download(
+        ticket.clone(),
+        ReceiveOptions {
+            output_dir: Some(recv_dir.clone()),
+            ..Default::default()
+        },
+        None,
+        cancel_rx,
+    )
+    .await;
+
+    assert!(
+        partial_path.exists(),
+        "partial store must exist before retry"
+    );
+
+    // Second attempt with same ticket: must succeed and produce the correct file.
+    let (_cancel_tx2, cancel_rx2) = common::no_cancel();
+    download(
+        ticket,
+        ReceiveOptions {
+            output_dir: Some(recv_dir.clone()),
+            ..Default::default()
+        },
+        None,
+        cancel_rx2,
+    )
+    .await
+    .expect("retry with same ticket should succeed");
+
+    assert_eq!(
+        std::fs::read(recv_dir.join("resume.txt")).unwrap(),
+        b"resume after cancel content"
+    );
+
+    // Temp store cleaned up after successful completion.
+    assert!(
+        wait_until_gone(&partial_path).await,
+        "partial store should be removed after successful completion"
     );
 
     drop(share);
@@ -179,6 +289,7 @@ async fn e2e_receiver_resumes_partial_download() {
 
     // Receive in the background and watch progress so we can cut the sender mid-transfer.
     let emitter = MockEventEmitter::new();
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     let recv_task = tokio::spawn(download(
         ticket.clone(),
         ReceiveOptions {
@@ -186,6 +297,7 @@ async fn e2e_receiver_resumes_partial_download() {
             ..Default::default()
         },
         Some(emitter.clone()),
+        cancel_rx,
     ));
 
     // Wait until a few MiB have transferred.
@@ -235,6 +347,7 @@ async fn e2e_receiver_resumes_partial_download() {
     );
 
     // Retry completes by resuming from the saved progress.
+    let (_cancel_tx2, cancel_rx2) = common::no_cancel();
     download(
         share2.ticket.clone(),
         ReceiveOptions {
@@ -242,6 +355,7 @@ async fn e2e_receiver_resumes_partial_download() {
             ..Default::default()
         },
         None,
+        cancel_rx2,
     )
     .await
     .expect("retry should resume and complete");

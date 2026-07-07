@@ -69,7 +69,7 @@
 		"noFolderSelected": "선택된 폴더 없음",
 		"conflictsMore": "... 외 {{count}}개",
 		"pasteTicket": "티켓을 여기에 붙여넣기:",
-		"ticketPlaceholder": "sendme 수신 티켓...",
+		"ticketPlaceholder": "AltSendme 수신 티켓...",
 		"howToReceive": "파일 받는 방법",
 		"instruction1": "보낸 사람이 온라인 상태이고 파일을 공유하고 있어야 합니다",
 		"instruction2": "보낸 사람으로부터 티켓 받기",
@@ -112,7 +112,8 @@
 		"duration": "소요 시간",
 		"avgSpeed": "평균 속도",
 		"multipleFiles": "파일 {{count}}개",
-		"donatePrompt": "더 좋게 만들어 주세요 -"
+		"donatePrompt": "AltSendme를 더 좋게 만들기 위해 ",
+		"donateLink": "기부하기"
 	},
 	"errors": {
 		"sharingFailed": "공유 실패",

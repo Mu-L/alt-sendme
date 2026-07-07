@@ -1,5 +1,5 @@
 import { IS_TAURI } from '@/lib/platform'
-import { invoke, openDialog } from '@/lib/platform-api'
+import { invoke, openDialog, pickDownloadDirectory } from '@/lib/platform-api'
 
 export type DownloadFolderSelectionResponse = {
 	uri: string
@@ -31,9 +31,8 @@ export class FileSelectedHandler {
 
 export async function selectDownloadFolder(): Promise<DownloadFolderSelectionResponse | null> {
 	if (!IS_TAURI) {
-		const selected = await openDialog({ directory: true, multiple: false })
-		if (!selected) return null
-		const path = Array.isArray(selected) ? selected[0] : selected
+		const path = await pickDownloadDirectory()
+		if (!path) return null
 		return { uri: path, path }
 	}
 

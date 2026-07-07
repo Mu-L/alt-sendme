@@ -70,6 +70,16 @@ impl EventEmitter for MockEventEmitter {
     }
 }
 
+/// Returns a cancel sender/receiver pair where the sender is never triggered.
+/// Pass the receiver to [`engine::download`] for tests that don't need cancellation.
+/// Keep the returned sender alive (binding it with `_`) until after `download` returns.
+pub fn no_cancel() -> (
+    tokio::sync::oneshot::Sender<()>,
+    tokio::sync::oneshot::Receiver<()>,
+) {
+    tokio::sync::oneshot::channel::<()>()
+}
+
 /// Helper to manage temp directories and files for E2E tests.
 pub struct TestFixture {
     pub dir: tempfile::TempDir,

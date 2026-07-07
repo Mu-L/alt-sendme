@@ -112,7 +112,8 @@
 		"duration": "Időtartam",
 		"avgSpeed": "Átlag sebesség",
 		"multipleFiles": "{{count}} fájl",
-		"donatePrompt": "Tedd jobbá -"
+		"donatePrompt": "Tegye jobbá az AltSendme-et ",
+		"donateLink": "adományozással"
 	},
 	"errors": {
 		"sharingFailed": "Sikertelen megosztás",

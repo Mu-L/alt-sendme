@@ -38,6 +38,7 @@ export function Dropzone({
 	onAddFolders,
 	onRemoveSelectedPath,
 	onClearSelection,
+	dropzoneDragProps,
 }: DropzoneProps) {
 	const { t } = useTranslation()
 	const hasSelection = selectedPaths.length > 0
@@ -257,6 +258,7 @@ export function Dropzone({
 			transition={{ duration: 0.3, ease: 'easeInOut' }}
 			style={getDropzoneStyles()}
 			className="relative border-2 border-dashed rounded-lg text-center cursor-pointer transition-all duration-200 bg-accent text-accent-foreground h-fit min-h-64 border-border overflow-hidden"
+			{...dropzoneDragProps}
 		>
 			{selectedPath && !isLoading && (
 				<TooltipProvider>

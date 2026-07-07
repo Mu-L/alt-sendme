@@ -69,7 +69,7 @@
 		"noFolderSelected": "Папка не вибрана",
 		"conflictsMore": "... і ще {{count}}",
 		"pasteTicket": "Вставте сюди тікет:",
-		"ticketPlaceholder": "sendme тікет отримання...",
+		"ticketPlaceholder": "AltSendme тікет отримання...",
 		"howToReceive": "Як отримувати файли",
 		"instruction1": "Відправник повинен бути в мережі і повинен поділитися файлом",
 		"instruction2": "Отримайте тікет від відправника",
@@ -112,7 +112,8 @@
 		"duration": "Тривалість",
 		"avgSpeed": "Середня швидкість",
 		"multipleFiles": "{{count}} файлів",
-		"donatePrompt": "Зробіть це кращим -"
+		"donatePrompt": "Зробіть AltSendme кращим, ",
+		"donateLink": "пожертвувавши"
 	},
 	"errors": {
 		"sharingFailed": "Помилка передачі",

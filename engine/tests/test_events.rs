@@ -15,6 +15,7 @@ async fn e2e_receiver_event_sequence() {
         .await
         .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -22,6 +23,7 @@ async fn e2e_receiver_event_sequence() {
             ..Default::default()
         },
         Some(receiver_emitter.clone()),
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -77,6 +79,7 @@ async fn e2e_sender_events_on_transfer() {
     .await
     .expect("start_share should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -84,6 +87,7 @@ async fn e2e_sender_events_on_transfer() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -104,10 +108,12 @@ async fn e2e_sender_events_on_transfer() {
 
 #[tokio::test]
 async fn e2e_invalid_ticket_errors() {
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     let result = download(
         "not-a-valid-ticket-string".to_string(),
         ReceiveOptions::default(),
         None,
+        cancel_rx,
     )
     .await;
 

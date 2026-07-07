@@ -69,7 +69,7 @@
 		"noFolderSelected": "フォルダが選択されていません",
 		"conflictsMore": "... 他 {{count}} 件",
 		"pasteTicket": "ここにチケットを貼り付け：",
-		"ticketPlaceholder": "sendme 受信チケット...",
+		"ticketPlaceholder": "AltSendme 受信チケット...",
 		"howToReceive": "ファイルの受信方法",
 		"instruction1": "送信者がオンラインでファイルを共有している必要があります",
 		"instruction2": "送信者からチケットを取得",
@@ -112,7 +112,8 @@
 		"duration": "所要時間",
 		"avgSpeed": "平均速度",
 		"multipleFiles": "{{count}} 件のファイル",
-		"donatePrompt": "もっと良くする -"
+		"donatePrompt": "AltSendmeをより良くするために",
+		"donateLink": "寄付する"
 	},
 	"errors": {
 		"sharingFailed": "共有に失敗しました",

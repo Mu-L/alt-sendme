@@ -4,9 +4,7 @@ export const RELAY_URL_INVALID_MESSAGE_KEY =
 
 function isLoopbackHost(hostname: string): boolean {
 	return (
-		hostname === 'localhost' ||
-		hostname === '127.0.0.1' ||
-		hostname === '[::1]'
+		hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 	)
 }
 
@@ -24,7 +22,8 @@ export function isValidRelayUrl(url: string): boolean {
 	// Enforce HTTPS so auth tokens are never sent in cleartext; allow plain
 	// HTTP only against loopback hosts for local self-host testing.
 	if (parsed.protocol === 'https:') return true
-	if (parsed.protocol === 'http:' && isLoopbackHost(parsed.hostname)) return true
+	if (parsed.protocol === 'http:' && isLoopbackHost(parsed.hostname))
+		return true
 	return false
 }
 

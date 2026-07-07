@@ -69,7 +69,7 @@
 		"noFolderSelected": "Klasör seçilmedi",
 		"conflictsMore": "... ve {{count}} tane daha",
 		"pasteTicket": "Anahtarı buraya yapıştırın:",
-		"ticketPlaceholder": "sendme alma anahtarı...",
+		"ticketPlaceholder": "AltSendme alma anahtarı...",
 		"howToReceive": "Dosya nasıl alınır",
 		"instruction1": "Gönderici çevrimiçi olmalı ve dosya paylaşıyor olmalı",
 		"instruction2": "Göndericiden bir anahtar alın",
@@ -112,7 +112,8 @@
 		"duration": "Süre",
 		"avgSpeed": "Ort. Hız",
 		"multipleFiles": "{{count}} dosya",
-		"donatePrompt": "Daha iyi hale getir -"
+		"donatePrompt": "AltSendme'yi daha iyi hale getirmek için ",
+		"donateLink": "bağış yapın"
 	},
 	"errors": {
 		"sharingFailed": "Paylaşım Başarısız",

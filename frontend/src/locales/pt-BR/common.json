@@ -69,7 +69,7 @@
 		"noFolderSelected": "Nenhuma pasta selecionada",
 		"conflictsMore": "... e mais {{count}}",
 		"pasteTicket": "Cole o ticket aqui:",
-		"ticketPlaceholder": "sendme ticket de recebimento...",
+		"ticketPlaceholder": "AltSendme ticket de recebimento...",
 		"howToReceive": "Como receber arquivos",
 		"instruction1": "O remetente deve estar online e compartilhando um arquivo",
 		"instruction2": "Obtenha um ticket do remetente",
@@ -112,7 +112,8 @@
 		"duration": "Duração",
 		"avgSpeed": "Velocidade Média",
 		"multipleFiles": "{{count}} arquivos",
-		"donatePrompt": "Torne-o melhor -"
+		"donatePrompt": "Melhore o AltSendme ",
+		"donateLink": "doando"
 	},
 	"errors": {
 		"sharingFailed": "Falha ao Compartilhar",

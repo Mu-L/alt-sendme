@@ -69,7 +69,7 @@
 		"noFolderSelected": "ยังไม่ได้เลือกโฟลเดอร์",
 		"conflictsMore": "... และอีก {{count}} รายการ",
 		"pasteTicket": "วางตั๋วที่นี่:",
-		"ticketPlaceholder": "ตั๋วรับ sendme...",
+		"ticketPlaceholder": "ตั๋วรับ AltSendme...",
 		"howToReceive": "วิธีรับไฟล์",
 		"instruction1": "ผู้ส่งต้องออนไลน์และกำลังแชร์ไฟล์",
 		"instruction2": "รับตั๋วจากผู้ส่ง",
@@ -112,7 +112,8 @@
 		"duration": "ระยะเวลา",
 		"avgSpeed": "ความเร็วเฉลี่ย",
 		"multipleFiles": "{{count}} ไฟล์",
-		"donatePrompt": "ทำให้ดีขึ้น -"
+		"donatePrompt": "ทำให้ AltSendme ดีขึ้นด้วยการ ",
+		"donateLink": "บริจาค"
 	},
 	"errors": {
 		"sharingFailed": "การแชร์ล้มเหลว",

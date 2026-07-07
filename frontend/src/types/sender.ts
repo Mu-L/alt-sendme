@@ -56,6 +56,13 @@ export interface DragDropState {
 	alertDialog: AlertDialogState
 }
 
+export interface DropzoneDragProps {
+	onDragEnter: (event: React.DragEvent<HTMLElement>) => void
+	onDragOver: (event: React.DragEvent<HTMLElement>) => void
+	onDragLeave: (event: React.DragEvent<HTMLElement>) => void
+	onDrop: (event: React.DragEvent<HTMLElement>) => void
+}
+
 export interface DropzoneProps {
 	isDragActive: boolean
 	selectedPaths: string[]
@@ -68,6 +75,7 @@ export interface DropzoneProps {
 	onAddFolders: () => Promise<void>
 	onRemoveSelectedPath: (path: string) => void
 	onClearSelection: () => void
+	dropzoneDragProps?: DropzoneDragProps
 }
 
 export interface BrowseButtonsProps {

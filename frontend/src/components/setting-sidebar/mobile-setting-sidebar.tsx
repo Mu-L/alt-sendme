@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import type React from 'react'
-import { IS_LINUX } from '@/lib/platform'
+import { IS_LINUX, IS_WEB } from '@/lib/platform'
 import { cn } from '../../lib/utils'
 import { useSidebar } from '../ui/sidebar'
 import { Button } from '../ui/button'
@@ -21,11 +21,12 @@ const MobileSettingSidebar: FC<MobileSettingSidebarProps> = ({
 			<header
 				className={cn(
 					isMobile ? 'flex' : 'hidden',
-					'gap-2 border-b fixed border-border inset-x-0 items-center bg-muted backdrop-blur-md z-10',
+					'gap-2 border-b border-border items-center bg-muted backdrop-blur-md z-10',
+					IS_WEB ? 'sticky top-0' : 'fixed inset-x-0',
 					className
 				)}
 				style={{
-					top: IS_LINUX ? LINUX_TITLE_BAR_HEIGHT : 0,
+					top: IS_WEB ? undefined : IS_LINUX ? LINUX_TITLE_BAR_HEIGHT : 0,
 					paddingTop: 'calc(0.625rem + env(safe-area-inset-top))',
 					paddingBottom: '0.625rem',
 					paddingLeft: 'calc(0.75rem + env(safe-area-inset-left))',

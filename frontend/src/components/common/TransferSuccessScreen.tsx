@@ -1,11 +1,7 @@
-import {
-	CheckCircle,
-	CoffeeIcon,
-	ExternalLinkIcon,
-	XCircle,
-} from 'lucide-react'
+import { CheckCircle, ExternalLinkIcon, XCircle } from 'lucide-react'
 import { useTranslation } from '../../i18n/react-i18next-compat'
 import { handleExternalLinkClick } from '../../lib/openExternalUrl'
+import { IS_WEB } from '../../lib/platform'
 import { DONATE_LINK } from '../../lib/version'
 import { formatFileSize } from '../../lib/utils'
 import type { SuccessScreenProps } from '../../types/transfer'
@@ -159,7 +155,7 @@ export function TransferSuccessScreen({
 				</div>
 			</div>
 
-			{isReceiver && onOpenFolder ? (
+			{isReceiver && onOpenFolder && !IS_WEB ? (
 				<div className="flex gap-3 w-full max-w-sm">
 					<Button
 						type="button"
@@ -181,18 +177,18 @@ export function TransferSuccessScreen({
 			)}
 
 			{!wasStopped ? (
-				<p className="flex flex-wrap items-center justify-center gap-x-1.5 text-center text-xs sm:text-sm text-muted-foreground">
-					<span>{t('common:transfer.donatePrompt')}</span>
+				<p className="text-center text-xs sm:text-sm text-muted-foreground">
+					{t('common:transfer.donatePrompt')}
 					<a
 						href={DONATE_LINK}
 						onClick={(event) => handleExternalLinkClick(event, DONATE_LINK)}
 						target="_blank"
 						rel="noopener noreferrer"
-						className="inline-flex items-center gap-1 font-medium text-foreground/70 underline decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-primary hover:decoration-primary/60"
+						className="font-medium text-foreground/70 underline decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-primary hover:decoration-primary/60"
 					>
-						<CoffeeIcon size={14} aria-hidden />
-						{t('common:donate')}
+						{t('common:transfer.donateLink')}
 					</a>
+					{t('common:transfer.donateSuffix', { defaultValue: '' })}
 				</p>
 			) : null}
 		</div>

@@ -22,7 +22,10 @@ type BaseUiInputProps = SharedInputProps &
 		nativeInput?: false
 	}
 
-type BaseUiOnlyInputPropNames = Exclude<keyof InputPrimitiveProps, keyof NativeInputProps>
+type BaseUiOnlyInputPropNames = Exclude<
+	keyof InputPrimitiveProps,
+	keyof NativeInputProps
+>
 type NativeSafeInputProps = NativeInputProps & {
 	[Key in BaseUiOnlyInputPropNames]?: never
 }

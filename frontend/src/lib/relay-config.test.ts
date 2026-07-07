@@ -37,7 +37,7 @@ describe('buildRelayConfigArg', () => {
 		)
 	})
 
-	it('strips persisted relay endpoints and tokens when relays are disabled', () => {
+	it('maps disabled mode to default on web where relays are required', () => {
 		assert.deepEqual(
 			buildRelayConfigArg({
 				relayMode: 'disabled',
@@ -46,7 +46,7 @@ describe('buildRelayConfigArg', () => {
 				relayFallback: 'public',
 			}),
 			{
-				mode: 'disabled',
+				mode: 'default',
 				urls: [],
 				auth_token: null,
 				fallback: 'public',

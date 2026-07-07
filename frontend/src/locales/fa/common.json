@@ -112,7 +112,8 @@
 		"duration": "مدت زمان",
 		"avgSpeed": "میانگین سرعت",
 		"multipleFiles": "{{count}} فایل",
-		"donatePrompt": "آن را بهتر کنید -"
+		"donatePrompt": "AltSendme را بهتر کنید با ",
+		"donateLink": "حمایت مالی"
 	},
 	"errors": {
 		"sharingFailed": "خطا در اشتراک‌گذاری",

@@ -22,6 +22,7 @@ async fn e2e_multi_file_roundtrip() {
 
     assert_eq!(share.entry_type, "collection");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -29,6 +30,7 @@ async fn e2e_multi_file_roundtrip() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");
@@ -66,6 +68,7 @@ async fn e2e_mixed_files_and_dirs() {
         .await
         .expect("start_share_items should succeed");
 
+    let (_cancel_tx, cancel_rx) = common::no_cancel();
     download(
         share.ticket.clone(),
         ReceiveOptions {
@@ -73,6 +76,7 @@ async fn e2e_mixed_files_and_dirs() {
             ..Default::default()
         },
         None,
+        cancel_rx,
     )
     .await
     .expect("download should succeed");

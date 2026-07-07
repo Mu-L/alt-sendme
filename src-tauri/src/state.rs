@@ -10,6 +10,11 @@ pub struct AppState {
     pub is_share_starting: bool, // True while start_sharing is preparing metadata/session
     pub is_transporting: bool,   // True when actual data transfer is happening
     pub launch_intent: Option<String>, // Path to file/folder passed via CLI (e.g. context menu)
+    /// Sender half of the cancel channel for the active receive. Dropping or sending cancels it.
+    pub current_receive_cancel: Option<tokio::sync::oneshot::Sender<()>>,
+    /// Hash hex of the most recently cancelled (partial) receive store still on disk.
+    /// Cleared when the partial store is deleted or consumed by a resume.
+    pub last_cancelled_recv_hash: Option<String>,
 }
 
 /// Handle for an active sharing session

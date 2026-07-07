@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-/**
- * Builds signed release APKs for Android (F-Droid / CI).
- *
- * Profiles (see ANDROID_APK_PROFILES):
- *   universal — all ABIs in one APK (F-Droid; default Tauri universal output)
- *   arm64     — `--target aarch64`  (arm64-v8a / armv8a)
- *   armv7     — `--target armv7`    (armeabi-v7a / armv7a)
- *   x86       — `--target i686`     (x86)
- *   x86_64    — `--target x86_64`   (x86_64)
- *
- * Per-ABI APKs use `--split-per-abi --target <arch>` so Gradle writes to
- * `apk/<abi>/release/` and does not overwrite the universal fat APK.
- *
- * @see https://v2.tauri.app/distribute/google-play/#separate-bundles-per-architecture
- */
 
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -237,9 +222,6 @@ function selectedProfiles() {
 	return names.map((name) => ({ name, ...APK_PROFILES[name] }))
 }
 
-// 0. Remove any partial gen/android tree (e.g. committed manifest/icons without
-// Gradle or Java sources), then run `tauri android init --ci` on a clean slate.
-// After init, restore committed custom assets (icons + AndroidManifest.xml).
 if (fs.existsSync(genAndroid)) {
 	console.log(
 		'android-release-build: removing gen/android before tauri android init'
@@ -274,7 +256,6 @@ if (!fs.existsSync(buildGradle)) {
 	process.exit(1)
 }
 
-// 1. CI keystore
 const keyBase64 = process.env.ANDROID_KEY_BASE64
 const keyAlias = process.env.ANDROID_KEY_ALIAS
 const keyPassword = process.env.ANDROID_KEY_PASSWORD
@@ -291,7 +272,6 @@ if (keyBase64 && keyAlias && keyPassword) {
 	)
 }
 
-// 2. Gradle patches (universal APK + optional release signing)
 run('node', [path.join(__dirname, 'apply-android-release-gradle-patches.js')])
 
 const keystore = readKeystoreProps()

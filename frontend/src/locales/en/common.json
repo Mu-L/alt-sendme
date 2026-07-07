@@ -69,10 +69,13 @@
 		"title": "Receive Files",
 		"subtitle": "Download files from sender using encrypted peer-to-peer connections over the internet.",
 		"saveToFolder": "Save to folder:",
+		"saveLocation": "Save location:",
 		"noFolderSelected": "No folder selected",
+		"browserDownloadsFallback": "Browser downloads folder",
+		"browserDownloadsHint": "This browser cannot pick a save folder. Files will download to your default downloads location.",
 		"conflictsMore": "... and {{count}} more",
 		"pasteTicket": "Paste the ticket here:",
-		"ticketPlaceholder": "sendme receive ticket...",
+		"ticketPlaceholder": "AltSendme receive ticket...",
 		"howToReceive": "How to receive files",
 		"instruction1": "Sender must be online and sharing a file",
 		"instruction2": "Get a ticket from the sender",
@@ -115,7 +118,8 @@
 		"duration": "Duration",
 		"avgSpeed": "Avg Speed",
 		"multipleFiles": "{{count}} Files",
-		"donatePrompt": "Make this better -"
+		"donatePrompt": "Make AltSendme better by ",
+		"donateLink": "donating"
 	},
 	"errors": {
 		"sharingFailed": "Sharing Failed",
