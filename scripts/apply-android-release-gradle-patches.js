@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-/**
- * Applies git-format patches to Tauri-generated app/build.gradle.kts (see Tauri
- * Android signing: https://v2.tauri.app/distribute/sign/android/).
- *
- * 1. scripts/patches/01-fdroid-gradle.patch — dependenciesInfo + universal APK (F-Droid).
- * 2. scripts/patches/02-signing-gradle.patch — only if src-tauri/gen/android/keystore.properties
- *    exists (Play/CI; matches official Gradle + keystore.properties flow).
- *
- * Idempotent: skips a patch if the file already contains the expected markers.
- * Regenerate patches after @tauri-apps/cli bumps: copy fresh gen output to
- * scripts/patches/android-app-build.gradle.kts.vanilla, edit desired end state,
- * then `git diff --no-index` between vanilla and edited copies under src-tauri/gen/... paths.
- *
- * Run after gen/android exists (e.g. after `npx tauri android build --apk`).
- */
 
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'

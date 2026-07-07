@@ -9,7 +9,7 @@
 		"predev:web": "test -f frontend/src/wasm/pkg/wasm_bridge.js || ./scripts/build-wasm-bridge.sh",
 		"build": "tsc -b && vite build",
 		"build:web": "pnpm build:wasm && tsc -b && vite build --mode web",
-		"build:web:vercel": "WEB_BASE=/ pnpm build:wasm && tsc -b && WEB_BASE=/ vite build --mode web && cp deploy/web/vercel.json frontend/dist/vercel.json",
+		"build:web:vercel": "WEB_BASE=/ pnpm build:wasm && tsc -b && WEB_BASE=/ vite build --mode web",
 		"deploy:web:vercel": "./scripts/deploy-web-vercel.sh",
 		"build:wasm": "./scripts/build-wasm-bridge.sh --release",
 		"preview": "vite preview",

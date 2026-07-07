@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Build wasm-bridge for the browser (wasm32-unknown-unknown) and run wasm-bindgen.
-#
-# ring (iroh tls-ring) compiles C code for wasm32; Apple clang does not support
-# that target. Use LLVM clang instead:
-#   brew install llvm   # macOS
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
