@@ -11,7 +11,7 @@
 		"build:web": "pnpm build:wasm && tsc -b && vite build --config vite.config.ts --mode web",
 		"build:web:vercel": "WEB_BASE=/ pnpm build:wasm && tsc -b && WEB_BASE=/ vite build --config vite.config.ts --mode web",
 		"deploy:web:vercel": "./scripts/deploy-web-vercel.sh",
-		"build:wasm": "./scripts/build-wasm-bridge.sh --release",
+		"build:wasm": "node ./scripts/build-wasm-bridge.js --release",
 		"preview": "vite preview --config vite.config.ts",
 		"preview:web": "vite preview --config vite.config.ts --mode web",
 		"tauri": "tauri",

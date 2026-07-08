@@ -18,7 +18,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           fetch-depth: 0
 
@@ -27,7 +27,7 @@ jobs:
           version: 10.12.1
 
       - name: setup node
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24.x'
           package-manager-cache: false
@@ -165,29 +165,26 @@ jobs:
             platform: 'windows-latest'
             arch: aarch64
             rust_target: aarch64-pc-windows-msvc
-            # WiX MSI cannot be cross-compiled for ARM64; NSIS only (see Tauri Windows installer docs).
             args: '--target aarch64-pc-windows-msvc --bundles nsis'
             cache_key: windows-aarch64
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.1
 
       - name: setup node
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24.x'
           cache: pnpm
 
-      # Toolchain @rev = Rust version (see dtolnay/rust-toolchain README). Use full patch tag, not @1.91.
-      # Quote targets so YAML does not treat the comma as a flow-sequence separator (only aarch64 was installed before).
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249 # 1.91.0
+        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249
         with:
           toolchain: 1.91.0
           components: rustfmt
@@ -197,7 +194,7 @@ jobs:
         if: contains(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils clang
 
       - name: Install NSIS (Windows only)
         if: matrix.platform == 'windows-latest'
@@ -212,7 +209,7 @@ jobs:
           echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Rust cache
-        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
           workspaces: './src-tauri -> target'
           key: ${{ matrix.cache_key }}-cargo
@@ -229,7 +226,13 @@ jobs:
       - name: install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      # Belt-and-suspenders: macOS builds need the relevant Apple targets on the active toolchain.
+      - name: Install WASM build tools
+        shell: bash
+        run: |
+          set -eux
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+
       - name: Ensure macOS targets
         if: matrix.platform == 'macos-latest'
         shell: bash
@@ -285,7 +288,7 @@ jobs:
           fi
           echo "All notarization secrets present"
 
-      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Tony Antony (9H7RVQAP36)"
@@ -308,8 +311,6 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
 
-      # Tauri's bundler hardcodes Ubuntu 22.04 deb dependency names. Rewrite them
-      # to also accept Debian / Ubuntu 24.04+ names, then overwrite the uploaded asset.
       - name: Patch Linux .deb dependencies (ubuntu only)
         if: contains(matrix.platform, 'ubuntu')
         shell: bash
@@ -319,9 +320,6 @@ jobs:
           RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
         run: node scripts/patch-linux-deb.js
 
-  # Uses repository secrets: ANDROID_KEY_BASE64, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
-  # (same names as https://v2.tauri.app/distribute/sign/android/).
-  # Builds universal (F-Droid) + per-ABI APKs (arm64, armv7, x86, x86_64); see scripts/android-release-build.js.
   android-release-apks:
     name: Android release APKs
     needs: prepare-release
@@ -330,7 +328,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           fetch-depth: 0
 
@@ -339,25 +337,24 @@ jobs:
           version: 10.12.1
 
       - name: Set up Node
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24.x'
           cache: pnpm
 
       - name: Set up JDK 17
-        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
         with:
-          # Match Tauri / plugin compileSdk 36 (see src-tauri/plugins/.../build.gradle.kts).
           packages: build-tools;36.0.0 platform-tools platforms;android-36
 
       - name: Set up NDK
-        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779
         id: setup-ndk
         with:
           ndk-version: r28b
@@ -377,14 +374,21 @@ jobs:
           fi
 
       - name: Set Rust 1.91 and Android targets
-        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249 # 1.91.0
+        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249
         with:
           toolchain: 1.91.0
           components: rustfmt
           targets: aarch64-linux-android,armv7-linux-androideabi
 
+      - name: Install WASM build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+
       - name: Rust cache
-        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
           workspaces: './src-tauri -> target'
           key: ubuntu-22.04-android-cargo
@@ -453,20 +457,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.1
 
       - name: Set up Node
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24.x'
           cache: pnpm
 
       - name: Set up Rust (WASM)
-        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249 # 1.91.0
+        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249
         with:
           toolchain: 1.91.0
           targets: wasm32-unknown-unknown
