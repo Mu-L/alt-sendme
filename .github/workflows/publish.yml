@@ -24,7 +24,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.12.1
 
       - name: setup node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -176,7 +176,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.12.1
 
       - name: setup node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -335,7 +335,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.12.1
 
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -446,9 +446,64 @@ jobs:
               "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=${RENAME}" >/dev/null
           done
 
+  deploy-web:
+    name: Deploy web app
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24.x'
+          cache: pnpm
+
+      - name: Set up Rust (WASM)
+        uses: dtolnay/rust-toolchain@3056ad9b1fc916cb9a55f7f72ae4a848b7d50249 # 1.91.0
+        with:
+          toolchain: 1.91.0
+          targets: wasm32-unknown-unknown
+
+      - name: Install clang for WASM (ring)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
+
+      - name: Extract version from tag and sync
+        shell: bash
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          pnpm pkg set version="$VERSION"
+          pnpm run sync-version
+          node scripts/validate-version.js
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@54.21.0
+
+      - name: Build and deploy to Vercel
+        env:
+          CC: clang
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: ./scripts/deploy-web-vercel.sh
+
   finalize-release:
     name: Finalize draft release
-    needs: [prepare-release, publish-tauri, android-release-apks]
+    needs: [prepare-release, publish-tauri, android-release-apks, deploy-web]
     permissions:
       contents: write
     runs-on: ubuntu-latest
