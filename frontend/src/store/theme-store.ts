@@ -38,7 +38,7 @@ export const useThemeStore = create<IThemeStore>()(
 			migrate: (persistedState) => {
 				const state = (persistedState ?? {}) as PersistedThemeState
 				if (IS_WEB && state.activeTheme === 'auto') {
-					return { activeTheme: 'light' }
+					return { activeTheme: 'light' as const }
 				}
 				return state
 			},
