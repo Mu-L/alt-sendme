@@ -71,57 +71,43 @@ The easiest way to get started is by downloading one of the following versions f
     <td><b>Platform</b></td>
     <td><b>Recommended</b></td>
     <td><b>Other formats</b></td>
-    <td><b>CLI</b></td>
     <td><b>Size</b></td>
-    <td><b>Notes</b></td>
   </tr>
   <tr>
     <td>💻 <b>Windows (x64)</b></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_x64-setup.exe'>Setup.exe</a></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_x64_en-US.msi'>MSI</a></td>
-    <td><a href='https://www.altsendme.com/en/downloads'>Link</a></td>
     <td>~10 MB</td>
-    <td>None</td>
   </tr>
   <tr>
     <td>💻 <b>macOS (Universal)</b></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_universal.dmg'>AltSendme.dmg</a></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_aarch64.dmg'>Apple Silicon</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_x64.dmg'>Intel</a></td>
-    <td><a href='https://www.altsendme.com/en/downloads'>Link</a></td>
     <td>~15 MB</td>
-    <td>None</td>
   </tr>
   <tr>
     <td>💻 <b>Linux (amd64)</b></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_amd64.deb'>AltSendme.deb</a></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-0.5.0-1.x86_64.rpm'>.rpm</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_amd64.AppImage'>AppImage</a></td>
-    <td><a href='https://www.altsendme.com/en/downloads'>Link</a></td>
     <td>~13 MB</td>
-    <td>Debian/Ubuntu; Fedora/RHEL → .rpm</td>
   </tr>
   <tr>
     <td>📱 <b>Android (arm64)</b></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-v0.5.0-arm64.apk'>AltSendme.apk</a></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-v0.5.0-armv7.apk'>armv7</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-v0.5.0-universal.apk'>universal</a></td>
-    <td>-</td>
     <td>~50 MB</td>
-    <td>Sideload APK; arm64 recommended</td>
   </tr>
   <tr>
     <td>⌨️ <b>CLI</b></td>
     <td><a href='https://www.altsendme.com/en/downloads'>Downloads</a></td>
     <td>-</td>
-    <td>-</td>
     <td>~4–5 MB</td>
-    <td>None</td>
   </tr>
   <tr>
-    <td>🌐 <b>Web</b></td>
+    <td>🌐 <b>Web (Limited throughput)</b></td>
     <td><a href='https://app.altsendme.com'>app.altsendme.com</a></td>
     <td>-</td>
-    <td>-</td>
     <td>~2 MB</td>
-    <td>Limited throughput without custom relay.</td>
   </tr>
 </table>
 
@@ -155,7 +141,25 @@ We're looking for Partners to join our mission! Partner with us and support whil
 3. Your friend pastes the ticket in their app, and the transfer begins.
 
 
-## Under the hood 
+## Comparison
+
+| | **AltSendme** | **Blip** | **LocalSend** | **Magic Wormhole** | **PairDrop** |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| Networking stack | QUIC via Iroh | Unknown | HTTPS/REST over TCP | encrypted TCP | WebRTC/DTLS (SCTP) |
+| Works over the internet | ✅ | ✅ | LAN only | ✅ | ✅ |
+| Saturates gigabit connections | ✅ | ✅ | ✅ (LAN only) | ✅ | ❌ (SCTP/browser ceiling) |
+| Open source | ✅ | ❌ | ✅ | ✅ | ✅ |
+| No account required | ✅ | ❌ | ✅ | ✅ | ✅ |
+| End-to-end encryption | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Send folders | ✅ | ✅ | ✅ | ✅ | ✅ (CLI only, not in browser) |
+| Resumable transfers | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Unlimited file size | ✅ | ✅ | ✅ | ✅ | Limited by browser memory |
+| Platforms | CLI + desktop + mobile + web | Desktop + mobile (no web/CLI) | Desktop + mobile (no web/CLI) | CLI only | Web/PWA + Android app + CLI |
+| The catch | WIP | Closed source; data handling cannot be audited | Same-network only, no resume | CLI-only; GUI front-ends are separate, community-maintained | WebRTC/SCTP throughput ceiling; browser memory limits |
+
+[Know more →](https://www.altsendme.com/en/compare)
+
+## Under the hood
 
 AltSendme uses [Iroh](https://www.iroh.computer) under the hood to enable peer-to-peer file transfer. It is a modern modular alternative to technologies like WebRTC and libp2p.
 
