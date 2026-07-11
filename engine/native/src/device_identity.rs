@@ -89,6 +89,7 @@ impl PairedDeviceStore {
             display_name = %device.display_name,
             device_type = %device.device_type,
             os = %device.os,
+            relay_url = ?device.relay_url,
             "pairing-dev"
         );
         let mut file = self.read_file()?;
@@ -102,6 +103,9 @@ impl PairedDeviceStore {
             existing.device_type = device.device_type;
             existing.os = device.os;
             existing.last_seen_at = device.last_seen_at;
+            if device.relay_url.is_some() {
+                existing.relay_url = device.relay_url;
+            }
             let saved = existing.clone();
             self.write_file(&file)?;
             tracing::info!(

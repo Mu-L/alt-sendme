@@ -57,6 +57,9 @@ pub struct PairedDevice {
     pub os: String,
     pub paired_at: u64,
     pub last_seen_at: u64,
+    /// Relay URL last known for this peer (from pairing ticket or discovery).
+    #[serde(default)]
+    pub relay_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
