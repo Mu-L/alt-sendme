@@ -1,9 +1,7 @@
-import { invoke, downloadDir } from '@/lib/platform-api'
-import { getRelayConfigArg } from '@/lib/relay'
-import { IS_DESKTOP } from '@/lib/platform'
 import { useTranslation } from '@/i18n'
-import { useAppSettingStore } from '@/store/app-setting'
+import { IS_DESKTOP } from '@/lib/platform'
 import { usePairedInviteStore } from '@/store/paired-invite-store'
+import { useReceiverActionsStore } from '@/store/receiver-actions-store'
 import {
 	AlertDialog,
 	AlertDialogContent,
@@ -20,7 +18,9 @@ export function PairedInviteDialog() {
 	const { t } = useTranslation()
 	const invite = usePairedInviteStore((s) => s.invite)
 	const setInvite = usePairedInviteStore((s) => s.setInvite)
-	const downloadsPath = useAppSettingStore((s) => s.downloadsPath)
+	const acceptPairedInvite = useReceiverActionsStore(
+		(s) => s.acceptPairedInvite
+	)
 
 	const decline = () => {
 		setInvite(null)
@@ -28,26 +28,21 @@ export function PairedInviteDialog() {
 
 	const accept = async () => {
 		if (!invite) return
-
-		try {
-			let outputPath = downloadsPath.trim()
-			if (!outputPath) {
-				outputPath = await downloadDir()
-			}
-
-			await invoke<string>('receive_file', {
-				ticket: invite.blob_ticket.trim(),
-				outputPath,
-				relay: getRelayConfigArg(),
-			})
-			setInvite(null)
-		} catch (error) {
-			console.error('Failed to accept paired invite:', error)
+		if (!acceptPairedInvite) {
 			toastManager.add({
 				title: t('common:errors.receiveFailed'),
-				description: String(error),
-				type: 'error',
+				description: t('common:receiver.openReceiveTabHint'),
+				type: 'warning',
 			})
+			return
+		}
+
+		const payload = invite
+		setInvite(null)
+		try {
+			await acceptPairedInvite(payload)
+		} catch (error) {
+			console.error('Failed to accept paired invite:', error)
 		}
 	}
 

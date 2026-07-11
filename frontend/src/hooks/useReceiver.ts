@@ -27,6 +27,9 @@ import {
 } from '@/lib/web-preview-error'
 import { getRelayConfigArg } from '../lib/relay'
 import { useAppSettingStore } from '@/store/app-setting'
+import { useReceiverActionsStore } from '@/store/receiver-actions-store'
+import { useTransferTabStore } from '@/store/transfer-tab-store'
+import type { PairedInvitePayload } from '@/lib/pairing-api'
 
 interface BackendFileMetadata {
 	file_name: string
@@ -531,56 +534,112 @@ export function useReceiver(): UseReceiverReturn {
 		}
 	}
 
-	const receiveWithTicket = async (ticketValue: string) => {
-		if (!ticketValue.trim()) return
+	const receiveWithTicket = useCallback(
+		async (ticketValue: string) => {
+			if (!ticketValue.trim()) return
 
-		try {
-			transferItemCountRef.current = previewMetadata?.itemCount
-			previewRequestSeqRef.current += 1
-			transferSeqRef.current += 1
-			setIsReceiving(true)
-			setIsTransporting(false)
-			setIsCompleted(false)
-			setTransferMetadata(null)
-			setTransferProgress(null)
-			setTransferStartTime(null)
-			setPreviewMetadata(null)
-			setIsPreviewLoading(false)
-			pendingConflictNoticeRef.current = null
-			folderOpenTriggeredRef.current = false
+			try {
+				if (transferItemCountRef.current == null) {
+					transferItemCountRef.current =
+						previewMetadataRef.current?.itemCount ??
+						previewMetadata?.itemCount
+				}
+				previewRequestSeqRef.current += 1
+				transferSeqRef.current += 1
+				setIsReceiving(true)
+				setIsTransporting(false)
+				setIsCompleted(false)
+				setTransferMetadata(null)
+				setTransferProgress(null)
+				setTransferStartTime(null)
+				setIsPreviewLoading(false)
+				pendingConflictNoticeRef.current = null
+				folderOpenTriggeredRef.current = false
 
-			await invoke<string>('receive_file', {
-				ticket: ticketValue.trim(),
-				outputPath: savePath,
-				relay: getRelayConfigArg(),
-			})
-		} catch (error) {
-			if (
-				String(error) === 'cancelled' ||
-				String(error).endsWith(': cancelled')
-			)
-				return
+				let outputPath = savePathRef.current.trim()
+				if (!outputPath && !IS_WEB) {
+					outputPath = await downloadDir()
+					setSavePath(outputPath)
+					savePathRef.current = outputPath
+				}
 
-			console.error('Failed to receive file:', error)
-			showAlert(
-				t('common:errors.receiveFailed'),
-				isWebPreviewError(error)
-					? getWebPreviewErrorMessage(
-							error,
-							t('common:webPreview.transferUnavailable')
-						)
-					: String(error),
-				'error'
-			)
-			setIsReceiving(false)
-			setIsTransporting(false)
-			setIsCompleted(false)
-		}
-	}
+				await invoke<string>('receive_file', {
+					ticket: ticketValue.trim(),
+					outputPath,
+					relay: getRelayConfigArg(),
+				})
+			} catch (error) {
+				if (
+					String(error) === 'cancelled' ||
+					String(error).endsWith(': cancelled')
+				)
+					return
+
+				console.error('Failed to receive file:', error)
+				showAlert(
+					t('common:errors.receiveFailed'),
+					isWebPreviewError(error)
+						? getWebPreviewErrorMessage(
+								error,
+								t('common:webPreview.transferUnavailable')
+							)
+						: String(error),
+					'error'
+				)
+				setIsReceiving(false)
+				setIsTransporting(false)
+				setIsCompleted(false)
+			}
+		},
+		[previewMetadata, showAlert, t]
+	)
 
 	const handleReceive = async () => {
 		await receiveWithTicket(ticket)
 	}
+
+	const acceptPairedInvite = useCallback(
+		async (invite: PairedInvitePayload) => {
+			if (isReceiving || isTransporting) {
+				showAlert(
+					t('common:receiver.receiveBusyTitle'),
+					t('common:receiver.receiveBusyDescription'),
+					'warning'
+				)
+				return
+			}
+
+			useTransferTabStore.getState().requestTab('receive')
+
+			const preview: TicketPreviewMetadata = {
+				fileName: invite.sender_name,
+				itemCount: invite.file_count,
+				size: invite.total_size,
+				mimeType:
+					invite.file_count > 1
+						? 'application/x-iroh-collection'
+						: undefined,
+			}
+			setTicket(invite.blob_ticket)
+			setPreviewMetadata(preview)
+			previewMetadataRef.current = preview
+			transferItemCountRef.current = invite.file_count
+			previewRequestSeqRef.current += 1
+			setIsPreviewLoading(false)
+
+			await receiveWithTicket(invite.blob_ticket)
+		},
+		[isReceiving, isTransporting, receiveWithTicket, showAlert, t]
+	)
+
+	const registerAcceptPairedInvite = useReceiverActionsStore(
+		(state) => state.registerAcceptPairedInvite
+	)
+
+	useEffect(() => {
+		registerAcceptPairedInvite(acceptPairedInvite)
+		return () => registerAcceptPairedInvite(null)
+	}, [acceptPairedInvite, registerAcceptPairedInvite])
 
 	const resetForNewTransfer = async () => {
 		// Zero the seq first so in-flight events from the cancelled transfer are ignored.

@@ -358,6 +358,11 @@ pub async fn receive_file(
     let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
     {
         let mut app_state = state.lock().await;
+        if app_state.current_receive_cancel.is_some() {
+            return Err(
+                "Already receiving a file. Wait for the current download to finish.".to_string(),
+            );
+        }
         app_state.current_receive_cancel = Some(cancel_tx);
     }
 

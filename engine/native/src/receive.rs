@@ -56,50 +56,52 @@ pub async fn download(
         storage::create_recv_store(&ticket.hash().to_hex().to_string()).await?;
     let mut cleanup_guard = storage::recv_cleanup_guard(iroh_data_dir);
     let db2 = db.clone();
+    let output_dir = options
+        .output_dir
+        .clone()
+        .unwrap_or_else(|| dirs::download_dir().unwrap_or_else(|| std::env::current_dir().unwrap()));
 
-    let fut = async move {
+    let transfer = async {
         let downloaded =
             download_to_store(ticket, addr, &endpoint, db.as_ref(), &app_handle).await?;
 
-        let output_dir = options.output_dir.unwrap_or_else(|| {
-            dirs::download_dir().unwrap_or_else(|| std::env::current_dir().unwrap())
-        });
-
-        let conflicts =
-            export_to_directory(&db, downloaded.collection, &output_dir).await?;
+        let conflicts = export_to_directory(&db, downloaded.collection, &output_dir).await?;
 
         if !conflicts.is_empty() {
             let payload = serde_json::to_string(&conflicts).unwrap_or_else(|_| "[]".to_string());
             emit_event_with_payload(&app_handle, "receive-conflicts", &payload);
         }
 
-        endpoint.close().await;
         emit_event(&app_handle, "receive-completed");
 
         anyhow::Ok((
             downloaded.total_files,
             downloaded.payload_size,
             downloaded.stats,
-            output_dir,
             conflicts.len(),
         ))
     };
 
-    let (total_files, payload_size, _stats, output_dir, conflict_count) = select! {
-        x = fut => match x {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!("Download operation failed: {}", e);
-                cleanup_guard.disarm();
-                db2.shutdown().await?;
-                anyhow::bail!("error: {e}");
-            }
-        },
+    let (total_files, payload_size, _stats, conflict_count) = match select! {
+        result = transfer => result,
         _ = cancel_rx => {
             tracing::info!("Download cancelled by user — preserving partial store for resume");
             cleanup_guard.disarm();
             db2.shutdown().await?;
+            endpoint.close().await;
             anyhow::bail!("cancelled");
+        }
+    } {
+        Ok(values) => {
+            endpoint.close().await;
+            values
+        }
+        Err(e) => {
+            tracing::error!("Download operation failed: {e}");
+            endpoint.close().await;
+            cleanup_guard.disarm();
+            db2.shutdown().await?;
+            anyhow::bail!("error: {e}");
         }
     };
 

@@ -12,6 +12,7 @@ import {
 } from '@/components/animate-ui/components/tabs'
 import { useTranslation } from '@/i18n'
 import { useSenderStore } from '@/store/sender-store'
+import { useTransferTabStore } from '@/store/transfer-tab-store'
 import { toastManager } from '@/components/ui/toast'
 import { relayFallbackToastDescriptionKey } from '@/lib/relay-fallback-toast'
 
@@ -25,6 +26,17 @@ export function IndexPage() {
 	// Store actions
 	const setSelectedPath = useSenderStore((state) => state.setSelectedPath)
 	const setPathType = useSenderStore((state) => state.setPathType)
+	const requestedTab = useTransferTabStore((state) => state.requestedTab)
+	const clearRequestedTab = useTransferTabStore(
+		(state) => state.clearRequestedTab
+	)
+
+	useEffect(() => {
+		if (requestedTab) {
+			setActiveTab(requestedTab)
+			clearRequestedTab()
+		}
+	}, [requestedTab, clearRequestedTab])
 
 	useEffect(() => {
 		isInitialRender.current = true
@@ -100,7 +112,7 @@ export function IndexPage() {
 							<TabsContent value="send">
 								<Sender onTransferStateChange={setIsSharing} />
 							</TabsContent>
-							<TabsContent value="receive">
+							<TabsContent forceMount value="receive" className="data-[state=inactive]:hidden">
 								<Receiver onTransferStateChange={setIsReceiving} />
 							</TabsContent>
 						</FramePanel>

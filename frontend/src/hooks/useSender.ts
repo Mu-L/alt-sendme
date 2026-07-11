@@ -843,7 +843,7 @@ export function useSender(): UseSenderReturn {
 			)
 			return
 		}
-		const fileCount = transferMetadata?.itemCount ?? 1
+		const fileCount = Math.max(selectedPaths.length, 1)
 		const totalSize = transferMetadata?.fileSize ?? 0
 		try {
 			const delivered = await invitePairedDevice(
