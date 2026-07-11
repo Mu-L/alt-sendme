@@ -139,6 +139,7 @@ impl ControlProtocol {
 
         let mut remote_info: Option<ControlMessage> = None;
         let mut remote_vote: Option<RememberVote> = None;
+        let mut pairing_completed = false;
         let session_id = uuid::Uuid::new_v4().to_string();
 
         loop {
@@ -343,6 +344,7 @@ impl ControlProtocol {
                         let _ = handle.emit_event("device-paired");
                     }
                 }
+                pairing_completed = true;
                 break;
             }
         }
@@ -365,6 +367,19 @@ impl ControlProtocol {
                 );
             } else {
                 pairing_dev!("control.session.send_remember_vote_ok", remote = %remote);
+            }
+        }
+
+        if pairing_completed {
+            // Hold the session until the joiner reads our messages and disconnects.
+            drop(send);
+            drop(recv);
+            pairing_dev!("control.session.wait_joiner", remote = %remote);
+            match tokio::time::timeout(Duration::from_secs(30), conn.closed()).await {
+                Ok(_err) => pairing_dev!("control.session.joiner_closed", remote = %remote),
+                Err(_) => {
+                    pairing_dev_warn!("control.session.joiner_wait_timeout", remote = %remote)
+                }
             }
         }
 
@@ -713,6 +728,42 @@ impl NodeService {
         pairing_dev!("join.open_bi", host_endpoint = %remote);
         let (mut send, mut recv) = conn.open_bi().await?;
 
+        pairing_dev!("join.read_host_pairing_info", host_endpoint = %remote);
+        let host_info = read_message(&mut recv)
+            .await
+            .context("read host PairingInfo")?;
+        let ControlMessage::PairingInfo {
+            endpoint_id,
+            display_name,
+            device_type,
+            os,
+            signature,
+        } = host_info
+        else {
+            anyhow::bail!("expected host PairingInfo");
+        };
+        let peer_id = EndpointId::from_str(&endpoint_id).context("invalid host endpoint id")?;
+        if !verify_challenge(&peer_id, &keying, &signature) {
+            anyhow::bail!("host PairingInfo signature invalid");
+        }
+        pairing_dev!(
+            "join.host_pairing_info_ok",
+            host_endpoint = %endpoint_id,
+            display_name = %display_name,
+            device_type = %device_type,
+            os = %os
+        );
+        let now = protocol::identity::unix_now_ms();
+        self.paired_store.remember(PairedDevice {
+            endpoint_id: endpoint_id.clone(),
+            display_name: display_name.clone(),
+            device_type: device_type.clone(),
+            os: os.clone(),
+            paired_at: now,
+            last_seen_at: now,
+        })?;
+        self.access.write().await.allowed.insert(peer_id);
+
         let info = ControlMessage::PairingInfo {
             endpoint_id: self.identity.endpoint_id(),
             display_name: self.identity.display_name(),
@@ -720,7 +771,9 @@ impl NodeService {
             os: self.identity.os(),
             signature: sign_challenge(&self.identity.secret_key, &keying),
         };
-        write_message(&mut send, &info).await?;
+        write_message(&mut send, &info)
+            .await
+            .context("write local PairingInfo")?;
         pairing_dev!(
             "join.sent_pairing_info",
             host_endpoint = %remote,
@@ -731,66 +784,50 @@ impl NodeService {
             session_id: uuid::Uuid::new_v4().to_string(),
             vote: RememberVote::Remember,
         };
-        write_message(&mut send, &vote).await?;
+        write_message(&mut send, &vote)
+            .await
+            .context("write RememberVote")?;
         pairing_dev!(
             "join.sent_remember_vote",
             host_endpoint = %remote,
             vote = ?RememberVote::Remember
         );
 
-        pairing_dev!("join.read_host_pairing_info", host_endpoint = %remote);
+        pairing_dev!("join.read_host_remember_vote", host_endpoint = %remote);
         match read_message(&mut recv).await {
-            Ok(ControlMessage::PairingInfo {
-                endpoint_id,
-                display_name,
-                device_type,
-                os,
-                signature,
+            Ok(ControlMessage::RememberVote {
+                vote: RememberVote::Remember,
+                ..
             }) => {
-                let peer_id = EndpointId::from_str(&endpoint_id)?;
-                if verify_challenge(&peer_id, &keying, &signature) {
-                    let now = protocol::identity::unix_now_ms();
-                    self.paired_store.remember(PairedDevice {
-                        endpoint_id: endpoint_id.clone(),
-                        display_name: display_name.clone(),
-                        device_type,
-                        os,
-                        paired_at: now,
-                        last_seen_at: now,
-                    })?;
-                    self.access.write().await.allowed.insert(peer_id);
-                    pairing_dev!(
-                        "pair.complete.stored",
-                        role = "joiner",
-                        host_endpoint = %endpoint_id,
-                        display_name = %display_name
-                    );
-                    if let Some(handle) = &self.app_handle {
-                        pairing_dev!("pair.emit_ui", event = "device-paired", role = "joiner");
-                        let _ = handle.emit_event("device-paired");
-                    }
-                    pairing_dev!("join.done", host_endpoint = %endpoint_id, success = true);
-                } else {
-                    pairing_dev_warn!(
-                        "join.host_pairing_info_bad_sig",
-                        host_endpoint = %endpoint_id
-                    );
-                }
+                pairing_dev!("join.host_remember_vote_ok", host_endpoint = %remote);
             }
-            Ok(_other) => {
+            Ok(other) => {
                 pairing_dev_warn!(
                     "join.unexpected_host_message",
-                    host_endpoint = %remote
+                    host_endpoint = %remote,
+                    kind = ?other
                 );
             }
             Err(err) => {
                 pairing_dev_warn!(
-                    "join.read_host_pairing_info_failed",
+                    "join.read_host_remember_vote_failed",
                     host_endpoint = %remote,
                     error = %err
                 );
             }
         }
+
+        pairing_dev!(
+            "pair.complete.stored",
+            role = "joiner",
+            host_endpoint = %endpoint_id,
+            display_name = %display_name
+        );
+        if let Some(handle) = &self.app_handle {
+            pairing_dev!("pair.emit_ui", event = "device-paired", role = "joiner");
+            let _ = handle.emit_event("device-paired");
+        }
+        pairing_dev!("join.done", host_endpoint = %endpoint_id, success = true);
         Ok(())
     }
 
