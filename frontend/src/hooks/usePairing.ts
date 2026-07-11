@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@/lib/platform-api'
 import { IS_DESKTOP } from '@/lib/platform'
 import {
@@ -15,7 +15,8 @@ import {
 } from '@/lib/pairing-api'
 import { useNodeCapability } from './useNodeCapability'
 
-const PAIRING_HOST_TTL_SECS = 60
+// Must match engine/protocol pairing::PAIRING_VOTE_TIMEOUT_SECS
+const PAIRING_HOST_TTL_SECS = 120
 
 export function usePairing() {
 	const [devices, setDevices] = useState<PairedDevice[]>([])
@@ -24,7 +25,15 @@ export function usePairing() {
 	const [hostExpiresIn, setHostExpiresIn] = useState<number | null>(null)
 	const [isJoining, setIsJoining] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
+	// Incremented each time a peer joins while this device is hosting a
+	// pairing window, so the UI can close the QR dialog and confirm success.
+	const [hostPairedCount, setHostPairedCount] = useState(0)
+	const pairingTicketRef = useRef<string | null>(null)
 	const { isNodeReady, nodeStatus } = useNodeCapability()
+
+	useEffect(() => {
+		pairingTicketRef.current = pairingTicket
+	}, [pairingTicket])
 
 	const refreshDevices = useCallback(async () => {
 		if (!IS_DESKTOP || !isNodeReady) {
@@ -64,6 +73,13 @@ export function usePairing() {
 
 		const setup = async () => {
 			const pairedUnlisten = await listen('device-paired', () => {
+				// The backend closes the pairing host once a peer completes the
+				// handshake, so the ticket is no longer valid.
+				if (pairingTicketRef.current != null) {
+					setPairingTicket(null)
+					setHostExpiresIn(null)
+					setHostPairedCount((count) => count + 1)
+				}
 				void refreshDevices()
 			})
 			if (disposed) {
@@ -174,6 +190,7 @@ export function usePairing() {
 		hostExpiresIn,
 		isJoining,
 		isLoading,
+		hostPairedCount,
 		isNodeReady,
 		nodeStatus,
 		refreshDevices,

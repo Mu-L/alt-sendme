@@ -1,5 +1,6 @@
 import { useTranslation } from '@/i18n'
 import { IS_DESKTOP } from '@/lib/platform'
+import { formatFileSize } from '@/lib/utils'
 import { usePairedInviteStore } from '@/store/paired-invite-store'
 import { useReceiverActionsStore } from '@/store/receiver-actions-store'
 import {
@@ -70,11 +71,16 @@ export function PairedInviteDialog() {
 					</AlertDialogTitle>
 					<AlertDialogDescription>
 						{invite
-							? t('common:receiver.receiveFromPairedDescription', {
-									sender: invite.sender_name,
-									count: invite.file_count,
-									size: `${Math.round(invite.total_size / 1024)} KB`,
-								})
+							? invite.total_size > 0
+								? t('common:receiver.receiveFromPairedDescription', {
+										sender: invite.sender_name,
+										count: invite.file_count,
+										size: formatFileSize(invite.total_size),
+									})
+								: t('common:receiver.receiveFromPairedDescriptionNoSize', {
+										sender: invite.sender_name,
+										count: invite.file_count,
+									})
 							: ''}
 					</AlertDialogDescription>
 				</AlertDialogHeader>

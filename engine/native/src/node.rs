@@ -1064,27 +1064,32 @@ impl NodeService {
             sender_name = %self.identity.display_name(),
             write_ms = elapsed_ms(write_start)
         );
-        // Hold the connection until the receiver accepts our stream and reads the invite.
+        // Hold the connection in the background so the receiver can read the
+        // invite, without blocking the caller (the UI needs a fast result).
         drop(send);
-        pairing_dev!(
-            "invite.wait_receiver",
-            remote_endpoint = %remote,
-            timeout_secs = 15
-        );
-        let wait_start = Instant::now();
-        match tokio::time::timeout(Duration::from_secs(15), conn.closed()).await {
-            Ok(closed) => pairing_dev!(
-                "invite.receiver_closed",
+        tokio::spawn(async move {
+            pairing_dev!(
+                "invite.wait_receiver",
                 remote_endpoint = %remote,
-                close_reason = ?closed,
-                wait_ms = elapsed_ms(wait_start)
-            ),
-            Err(_) => pairing_dev_warn!(
-                "invite.receiver_wait_timeout",
-                remote_endpoint = %remote,
-                wait_ms = elapsed_ms(wait_start)
-            ),
-        }
+                timeout_secs = 15
+            );
+            let wait_start = Instant::now();
+            match tokio::time::timeout(Duration::from_secs(15), conn.closed()).await {
+                Ok(closed) => pairing_dev!(
+                    "invite.receiver_closed",
+                    remote_endpoint = %remote,
+                    close_reason = ?closed,
+                    wait_ms = elapsed_ms(wait_start)
+                ),
+                // Expected when the receiver keeps the session open while it
+                // downloads; the invite itself was already delivered.
+                Err(_) => pairing_dev!(
+                    "invite.receiver_wait_timeout",
+                    remote_endpoint = %remote,
+                    wait_ms = elapsed_ms(wait_start)
+                ),
+            }
+        });
         pairing_dev!(
             "invite.done",
             remote_endpoint = %remote,

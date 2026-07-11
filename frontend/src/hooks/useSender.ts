@@ -17,6 +17,9 @@ import {
 	type PairedDevice,
 } from '@/lib/pairing-api'
 import { useNodeCapability } from '@/hooks/useNodeCapability'
+import { toastManager } from '../components/ui/toast'
+
+export type PairedInviteStatus = 'sending' | 'sent' | 'failed'
 
 export interface UseSenderReturn {
 	// View state (replaces isSharing, isTransporting, isCompleted)
@@ -40,6 +43,7 @@ export interface UseSenderReturn {
 	activeConnectionCount: number
 	pairedDevices: PairedDevice[]
 	isNodeReady: boolean
+	pairedInviteStatus: Record<string, PairedInviteStatus>
 	onInvitePairedDevice: (endpointId: string) => Promise<void>
 
 	handleFileSelect: (
@@ -96,7 +100,25 @@ export function useSender(): UseSenderReturn {
 	} = useSenderStore()
 
 	const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([])
+	const [pairedInviteStatus, setPairedInviteStatus] = useState<
+		Record<string, PairedInviteStatus>
+	>({})
 	const { isNodeReady } = useNodeCapability()
+
+	const setInviteStatus = useCallback(
+		(endpointId: string, status: PairedInviteStatus | null) => {
+			setPairedInviteStatus((prev) => {
+				if (status === null) {
+					if (!(endpointId in prev)) return prev
+					const next = { ...prev }
+					delete next[endpointId]
+					return next
+				}
+				return { ...prev, [endpointId]: status }
+			})
+		},
+		[]
+	)
 
 	const refreshPairedDevices = useCallback(async () => {
 		if (!IS_DESKTOP) {
@@ -833,59 +855,80 @@ export function useSender(): UseSenderReturn {
 		await stopSharing()
 	}
 
+	const resolveShareTotalSize = async (): Promise<number> => {
+		if (transferMetadata?.fileSize) return transferMetadata.fileSize
+		try {
+			const sizes = await Promise.all(
+				selectedPaths.map((path) =>
+					invoke<number>('get_file_size', { path }).catch(() => 0)
+				)
+			)
+			return sizes.reduce((sum, size) => sum + size, 0)
+		} catch {
+			return 0
+		}
+	}
+
 	const onInvitePairedDevice = async (endpointId: string) => {
-		console.log('[paired-invite] sender: invite requested', {
-			endpointId,
-			hasTicket: Boolean(ticket),
-			isNodeReady,
-			fileCount: Math.max(selectedPaths.length, 1),
-			totalSize: transferMetadata?.fileSize ?? 0,
-		})
 		if (!ticket) {
 			console.warn('[paired-invite] sender: skipped — no active share ticket')
 			return
 		}
 		if (!isNodeReady) {
 			console.warn('[paired-invite] sender: skipped — node not ready')
-			showAlert(
-				t('common:settings.devices.nodeUnavailableTitle'),
-				t('common:settings.devices.nodeUnavailableHint'),
-				'error'
-			)
+			toastManager.add({
+				title: t('common:settings.devices.nodeUnavailableTitle'),
+				description: t('common:settings.devices.nodeUnavailableHint'),
+				type: 'error',
+			})
 			return
 		}
+		if (pairedInviteStatus[endpointId] === 'sending') return
+
+		const deviceName =
+			pairedDevices.find((device) => device.endpoint_id === endpointId)
+				?.display_name ?? t('common:sender.pairedDevices.unknownPeer')
 		const fileCount = Math.max(selectedPaths.length, 1)
-		const totalSize = transferMetadata?.fileSize ?? 0
+		setInviteStatus(endpointId, 'sending')
 		try {
+			const totalSize = await resolveShareTotalSize()
 			const delivered = await invitePairedDevice(
 				endpointId,
 				ticket,
 				fileCount,
 				totalSize
 			)
-			console.log('[paired-invite] sender: invite result', {
-				endpointId,
-				delivered,
-			})
 			if (delivered) {
-				showAlert(t('common:sender.pairedDevices.inviteSent'), '', 'info')
+				setInviteStatus(endpointId, 'sent')
+				toastManager.add({
+					title: t('common:sender.pairedDevices.inviteSentTo', {
+						name: deviceName,
+					}),
+					description: t('common:sender.pairedDevices.inviteSentDesc'),
+					type: 'success',
+				})
+				setTimeout(() => setInviteStatus(endpointId, null), 5000)
 			} else {
-				showAlert(
-					t('common:sender.pairedDevices.inviteFailed'),
-					t('common:sender.pairedDevices.deviceUnreachable'),
-					'error'
-				)
+				setInviteStatus(endpointId, 'failed')
+				toastManager.add({
+					title: t('common:sender.pairedDevices.inviteFailed'),
+					description: t('common:sender.pairedDevices.deviceUnreachable'),
+					type: 'error',
+				})
+				setTimeout(() => setInviteStatus(endpointId, null), 4000)
 			}
 		} catch (error) {
 			console.error('[paired-invite] sender: invite failed', {
 				endpointId,
 				error,
 			})
-			showAlert(
-				t('common:sender.pairedDevices.inviteFailed'),
-				String(error),
-				'error'
-			)
+			setInviteStatus(endpointId, 'failed')
+			toastManager.add({
+				title: t('common:sender.pairedDevices.inviteFailed'),
+				description: String(error),
+				type: 'error',
+			})
+			setTimeout(() => setInviteStatus(endpointId, null), 4000)
 		}
 	}
 
@@ -929,6 +972,7 @@ export function useSender(): UseSenderReturn {
 		activeConnectionCount,
 		pairedDevices,
 		isNodeReady,
+		pairedInviteStatus,
 		onInvitePairedDevice,
 
 		handleFileSelect,

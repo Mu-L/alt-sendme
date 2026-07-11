@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Pencil, Plus, QrCode, Trash2 } from 'lucide-react'
+import { Copy, Loader2, Pencil, Plus, QrCode, Trash2 } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
 import { usePairing } from '../../../hooks/usePairing'
 import { Button } from '../../ui/button'
@@ -184,7 +184,14 @@ function PairJoinModal({
 						disabled={isLoading || !code.trim()}
 						onClick={handleJoin}
 					>
-						{t('common:settings.devices.pairDevice')}
+						{isLoading ? (
+							<>
+								<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+								{t('common:settings.devices.pairing')}
+							</>
+						) : (
+							t('common:settings.devices.pairDevice')
+						)}
 					</Button>
 				</AlertDialogFooter>
 			</AlertDialogContent>
@@ -291,6 +298,7 @@ export function DevicesSettings() {
 		hostExpiresIn,
 		isJoining,
 		isLoading,
+		hostPairedCount,
 		isNodeReady,
 		nodeStatus,
 		openHostPairing,
@@ -304,6 +312,17 @@ export function DevicesSettings() {
 	const [joinOpen, setJoinOpen] = useState(false)
 	const [renameThisOpen, setRenameThisOpen] = useState(false)
 	const [renamePeerId, setRenamePeerId] = useState<string | null>(null)
+
+	// When a peer joins our open pairing window, close the QR dialog and
+	// confirm success instead of leaving the stale code on screen.
+	useEffect(() => {
+		if (hostPairedCount === 0) return
+		setHostOpen(false)
+		toastManager.add({
+			title: t('common:settings.devices.devicePaired'),
+			type: 'success',
+		})
+	}, [hostPairedCount, t])
 
 	if (!IS_DESKTOP) {
 		return (

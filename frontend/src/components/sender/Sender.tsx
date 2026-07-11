@@ -41,6 +41,7 @@ export function Sender({ onTransferStateChange }: SenderProps) {
 		activeConnectionCount,
 		pairedDevices,
 		isNodeReady,
+		pairedInviteStatus,
 		onInvitePairedDevice,
 		handleFileSelect,
 		handleFilesSelect,
@@ -142,6 +143,7 @@ export function Sender({ onTransferStateChange }: SenderProps) {
 							activeConnectionCount={activeConnectionCount}
 							pairedDevices={pairedDevices}
 							isNodeReady={isNodeReady}
+							pairedInviteStatus={pairedInviteStatus}
 							onInvitePairedDevice={onInvitePairedDevice}
 							onStartSharing={startSharing}
 							onStopSharing={stopSharing}

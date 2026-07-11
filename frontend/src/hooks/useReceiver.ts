@@ -613,7 +613,7 @@ export function useReceiver(): UseReceiverReturn {
 				showAlert(
 					t('common:receiver.receiveBusyTitle'),
 					t('common:receiver.receiveBusyDescription'),
-					'warning'
+					'info'
 				)
 				return
 			}

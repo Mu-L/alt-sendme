@@ -1,4 +1,4 @@
-import { CheckCircle, Copy, Square } from 'lucide-react'
+import { Check, CheckCircle, Copy, Loader2, Square } from 'lucide-react'
 import { useTranslation } from '../../i18n/react-i18next-compat'
 import type {
 	SharingControlsProps,
@@ -28,6 +28,7 @@ export function SharingActiveCard({
 	activeConnectionCount = 0,
 	pairedDevices = [],
 	isNodeReady = false,
+	pairedInviteStatus = {},
 	onInvitePairedDevice,
 	onCopyTicket,
 	onStopSharing,
@@ -152,6 +153,7 @@ export function SharingActiveCard({
 					<ul className="space-y-2">
 						{pairedDevices.map((device) => {
 							const Icon = deviceTypeIcon(device.device_type)
+							const inviteStatus = pairedInviteStatus[device.endpoint_id]
 							return (
 								<li
 									key={device.endpoint_id}
@@ -172,9 +174,22 @@ export function SharingActiveCard({
 										type="button"
 										size="sm"
 										variant="outline"
+										disabled={inviteStatus === 'sending'}
 										onClick={() => onInvitePairedDevice(device.endpoint_id)}
 									>
-										{t('common:sender.pairedDevices.send')}
+										{inviteStatus === 'sending' ? (
+											<>
+												<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+												{t('common:sender.pairedDevices.sending')}
+											</>
+										) : inviteStatus === 'sent' ? (
+											<>
+												<Check className="w-3.5 h-3.5 mr-1.5" />
+												{t('common:sender.pairedDevices.sent')}
+											</>
+										) : (
+											t('common:sender.pairedDevices.send')
+										)}
 									</Button>
 								</li>
 							)
