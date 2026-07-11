@@ -18,7 +18,7 @@ use protocol::{
 };
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::device_identity::{load_or_create_identity, DeviceIdentity, DeviceInfo, PairedDeviceStore};
 
@@ -43,9 +43,22 @@ impl EndpointHooks for PairedOnlyHook {
         }
         let remote = conn.remote_id();
         let access = self.access.read().await;
-        if access.pairing_host_open || access.allowed.contains(&remote) {
+        let allowed = access.allowed.contains(&remote);
+        if access.pairing_host_open || allowed {
+            info!(
+                remote = %remote,
+                pairing_host_open = access.pairing_host_open,
+                allowed,
+                allowed_count = access.allowed.len(),
+                "paired-invite: control handshake accepted"
+            );
             return AfterHandshakeOutcome::accept();
         }
+        warn!(
+            remote = %remote,
+            allowed_count = access.allowed.len(),
+            "paired-invite: control handshake rejected (peer not allowed)"
+        );
         AfterHandshakeOutcome::Reject {
             error_code: 403u32.into(),
             reason: b"unauthorized control peer".to_vec(),
@@ -75,8 +88,23 @@ impl std::fmt::Debug for ControlProtocol {
 impl ControlProtocol {
     async fn handle_connection(&self, conn: Connection) -> anyhow::Result<()> {
         let remote = conn.remote_id();
-        let keying = export_connection_keying_material(&conn)?;
-        let (mut send, mut recv) = conn.accept_bi().await?;
+        let local = self.ctx.identity.endpoint_id();
+        let allowed = self.is_allowed(&remote).await;
+        let in_store = self.is_in_paired_store(&remote).await;
+        info!(
+            remote = %remote,
+            local = %local,
+            allowed,
+            in_paired_store = in_store,
+            "paired-invite: control session started"
+        );
+
+        let keying = export_connection_keying_material(&conn).context("export keying material")?;
+        let (mut send, mut recv) = conn
+            .accept_bi()
+            .await
+            .context("accept bi stream for control session")?;
+        info!(remote = %remote, "paired-invite: bi stream accepted");
 
         let our_info = ControlMessage::PairingInfo {
             endpoint_id: self.ctx.identity.endpoint_id(),
@@ -84,7 +112,10 @@ impl ControlProtocol {
             device_type: self.ctx.identity.meta.device_type.clone(),
             signature: sign_challenge(&self.ctx.identity.secret_key, &keying),
         };
-        write_message(&mut send, &our_info).await?;
+        write_message(&mut send, &our_info)
+            .await
+            .context("write local PairingInfo")?;
+        info!(remote = %remote, "paired-invite: sent local PairingInfo");
 
         let mut remote_info: Option<ControlMessage> = None;
         let mut remote_vote: Option<RememberVote> = None;
@@ -93,7 +124,15 @@ impl ControlProtocol {
         loop {
             let msg = match read_message(&mut recv).await {
                 Ok(m) => m,
-                Err(_) => break,
+                Err(err) => {
+                    info!(
+                        remote = %remote,
+                        error = %err,
+                        had_remote_info = remote_info.is_some(),
+                        "paired-invite: control read ended"
+                    );
+                    break;
+                }
             };
             match msg {
                 ControlMessage::PairingInfo {
@@ -106,9 +145,19 @@ impl ControlProtocol {
                         continue;
                     };
                     if !verify_challenge(&peer_id, &keying, &signature) {
-                        warn!("pairing-info signature invalid from {remote}");
+                        warn!(
+                            remote = %remote,
+                            peer_id = %endpoint_id,
+                            "paired-invite: PairingInfo signature invalid"
+                        );
                         continue;
                     }
+                    info!(
+                        remote = %remote,
+                        peer_id = %endpoint_id,
+                        display_name = %display_name,
+                        "paired-invite: received remote PairingInfo"
+                    );
                     remote_info = Some(ControlMessage::PairingInfo {
                         endpoint_id,
                         display_name,
@@ -117,6 +166,7 @@ impl ControlProtocol {
                     });
                 }
                 ControlMessage::RememberVote { vote, .. } => {
+                    info!(remote = %remote, ?vote, "paired-invite: received RememberVote");
                     remote_vote = Some(vote);
                 }
                 ControlMessage::Invite {
@@ -125,7 +175,24 @@ impl ControlProtocol {
                     total_size,
                     sender_name,
                 } => {
-                    if !self.is_allowed(&remote).await {
+                    let allowed = self.is_allowed(&remote).await;
+                    let in_store = self.is_in_paired_store(&remote).await;
+                    info!(
+                        remote = %remote,
+                        allowed,
+                        in_paired_store = in_store,
+                        file_count,
+                        total_size,
+                        sender_name = %sender_name,
+                        ticket_len = blob_ticket.len(),
+                        "paired-invite: received Invite"
+                    );
+                    if !allowed {
+                        warn!(
+                            remote = %remote,
+                            in_paired_store = in_store,
+                            "paired-invite: Invite dropped (peer not in access allowlist)"
+                        );
                         continue;
                     }
                     let payload = serde_json::json!({
@@ -136,9 +203,24 @@ impl ControlProtocol {
                         "remote_endpoint_id": remote.to_string(),
                     });
                     if let Some(handle) = &self.ctx.app_handle {
-                        let _ = handle.emit_event_with_payload(
+                        match handle.emit_event_with_payload(
                             "paired-invite-received",
                             &payload.to_string(),
+                        ) {
+                            Ok(()) => info!(
+                                remote = %remote,
+                                "paired-invite: emitted paired-invite-received event"
+                            ),
+                            Err(err) => warn!(
+                                remote = %remote,
+                                error = %err,
+                                "paired-invite: failed to emit paired-invite-received event"
+                            ),
+                        }
+                    } else {
+                        warn!(
+                            remote = %remote,
+                            "paired-invite: no app handle; Invite not forwarded to UI"
                         );
                     }
                 }
@@ -186,14 +268,30 @@ impl ControlProtocol {
                 session_id,
                 vote: RememberVote::Remember,
             };
-            let _ = write_message(&mut send, &vote).await;
+            if let Err(err) = write_message(&mut send, &vote).await {
+                info!(
+                    remote = %remote,
+                    error = %err,
+                    "paired-invite: failed to send RememberVote (peer may have closed)"
+                );
+            }
         }
 
+        info!(remote = %remote, "paired-invite: control session finished");
         Ok(())
     }
 
     async fn is_allowed(&self, remote: &EndpointId) -> bool {
         self.ctx.access.read().await.allowed.contains(remote)
+    }
+
+    async fn is_in_paired_store(&self, remote: &EndpointId) -> bool {
+        let remote_str = remote.to_string();
+        self.ctx
+            .paired_store
+            .list()
+            .ok()
+            .is_some_and(|devices| devices.iter().any(|d| d.endpoint_id == remote_str))
     }
 
     async fn allow_peer(&self, remote: EndpointId) {
@@ -204,8 +302,13 @@ impl ControlProtocol {
 impl ProtocolHandler for ControlProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
         let this = self.clone();
+        let remote = connection.remote_id();
         if let Err(err) = this.handle_connection(connection).await {
-            warn!("control connection failed: {err:#}");
+            warn!(
+                remote = %remote,
+                error = %err,
+                "paired-invite: control connection failed"
+            );
         }
         Ok(())
     }
@@ -236,6 +339,12 @@ impl NodeService {
         let identity = Arc::new(load_or_create_identity(data_dir)?);
         let paired_store = Arc::new(PairedDeviceStore::new(data_dir));
         let allowed = load_allowed_from_store(&paired_store)?;
+        info!(
+            local_endpoint = %identity.endpoint_id(),
+            allowed_peers = ?allowed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+            allowed_count = allowed.len(),
+            "paired-invite: node started"
+        );
 
         let access = Arc::new(RwLock::new(AccessState {
             allowed,
@@ -425,11 +534,33 @@ impl NodeService {
         total_size: u64,
     ) -> anyhow::Result<bool> {
         let remote = EndpointId::from_str(remote_endpoint_id)?;
-        if !self.access.read().await.allowed.contains(&remote) {
+        let local = self.identity.endpoint_id();
+        let in_allowlist = self.access.read().await.allowed.contains(&remote);
+        info!(
+            local_endpoint = %local,
+            remote_endpoint = %remote,
+            in_allowlist,
+            file_count,
+            total_size,
+            ticket_len = blob_ticket.len(),
+            "paired-invite: sender inviting paired device"
+        );
+        if !in_allowlist {
+            warn!(
+                remote_endpoint = %remote,
+                "paired-invite: sender abort — remote not in allowlist"
+            );
             anyhow::bail!("unknown paired device");
         }
         let addr = EndpointAddr::from(remote);
         let runtime = self.runtime.lock().await;
+        let local_node = runtime.endpoint.id().to_string();
+        info!(
+            local_endpoint = %local,
+            local_node = %local_node,
+            remote_endpoint = %remote,
+            "paired-invite: sender connecting control channel"
+        );
         let connect = tokio::time::timeout(
             Duration::from_secs(30),
             runtime.endpoint.connect(addr, CONTROL_ALPN),
@@ -437,17 +568,53 @@ impl NodeService {
         .await;
         drop(runtime);
 
-        let Ok(Ok(conn)) = connect else {
-            return Ok(false);
+        let conn = match connect {
+            Ok(Ok(conn)) => {
+                info!(
+                    remote_endpoint = %remote,
+                    remote_conn = %conn.remote_id(),
+                    "paired-invite: sender connected"
+                );
+                conn
+            }
+            Ok(Err(err)) => {
+                warn!(
+                    remote_endpoint = %remote,
+                    error = %err,
+                    "paired-invite: sender connect failed"
+                );
+                return Ok(false);
+            }
+            Err(_) => {
+                warn!(
+                    remote_endpoint = %remote,
+                    "paired-invite: sender connect timed out (30s)"
+                );
+                return Ok(false);
+            }
         };
-        let (mut send, _recv) = conn.open_bi().await?;
+
+        let (mut send, _recv) = conn
+            .open_bi()
+            .await
+            .context("open bi stream for invite")?;
+        info!(remote_endpoint = %remote, "paired-invite: sender opened bi stream");
+
         let invite = ControlMessage::Invite {
             blob_ticket: blob_ticket.to_string(),
             file_count,
             total_size,
             sender_name: self.identity.display_name().to_string(),
         };
-        write_message(&mut send, &invite).await?;
+        write_message(&mut send, &invite)
+            .await
+            .context("write Invite message")?;
+        info!(
+            remote_endpoint = %remote,
+            file_count,
+            total_size,
+            "paired-invite: sender wrote Invite (closing connection)"
+        );
         Ok(true)
     }
 }

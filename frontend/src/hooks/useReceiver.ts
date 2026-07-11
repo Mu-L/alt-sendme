@@ -600,7 +600,16 @@ export function useReceiver(): UseReceiverReturn {
 
 	const acceptPairedInvite = useCallback(
 		async (invite: PairedInvitePayload) => {
+			console.log('[paired-invite] receiver: acceptPairedInvite called', {
+				sender: invite.sender_name,
+				fileCount: invite.file_count,
+				totalSize: invite.total_size,
+				isReceiving,
+				isTransporting,
+				transferSeq: transferSeqRef.current,
+			})
 			if (isReceiving || isTransporting) {
+				console.warn('[paired-invite] receiver: busy — declining auto-start')
 				showAlert(
 					t('common:receiver.receiveBusyTitle'),
 					t('common:receiver.receiveBusyDescription'),
@@ -628,6 +637,7 @@ export function useReceiver(): UseReceiverReturn {
 			setIsPreviewLoading(false)
 
 			await receiveWithTicket(invite.blob_ticket)
+			console.log('[paired-invite] receiver: receiveWithTicket finished')
 		},
 		[isReceiving, isTransporting, receiveWithTicket, showAlert, t]
 	)

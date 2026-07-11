@@ -834,8 +834,19 @@ export function useSender(): UseSenderReturn {
 	}
 
 	const onInvitePairedDevice = async (endpointId: string) => {
-		if (!ticket) return
+		console.log('[paired-invite] sender: invite requested', {
+			endpointId,
+			hasTicket: Boolean(ticket),
+			isNodeReady,
+			fileCount: Math.max(selectedPaths.length, 1),
+			totalSize: transferMetadata?.fileSize ?? 0,
+		})
+		if (!ticket) {
+			console.warn('[paired-invite] sender: skipped — no active share ticket')
+			return
+		}
 		if (!isNodeReady) {
+			console.warn('[paired-invite] sender: skipped — node not ready')
 			showAlert(
 				t('common:settings.devices.nodeUnavailableTitle'),
 				t('common:settings.devices.nodeUnavailableHint'),
@@ -852,6 +863,10 @@ export function useSender(): UseSenderReturn {
 				fileCount,
 				totalSize
 			)
+			console.log('[paired-invite] sender: invite result', {
+				endpointId,
+				delivered,
+			})
 			if (delivered) {
 				showAlert(t('common:sender.pairedDevices.inviteSent'), '', 'info')
 			} else {
@@ -862,7 +877,10 @@ export function useSender(): UseSenderReturn {
 				)
 			}
 		} catch (error) {
-			console.error('Failed to invite paired device:', error)
+			console.error('[paired-invite] sender: invite failed', {
+				endpointId,
+				error,
+			})
 			showAlert(
 				t('common:sender.pairedDevices.inviteFailed'),
 				String(error),

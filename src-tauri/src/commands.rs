@@ -765,12 +765,31 @@ pub async fn invite_paired_device(
     total_size: u64,
     state: State<'_, AppStateMutex>,
 ) -> Result<InviteDelivered, String> {
+    tracing::info!(
+        remote_endpoint = %endpoint_id,
+        file_count,
+        total_size,
+        ticket_len = blob_ticket.len(),
+        "paired-invite: invite_paired_device command"
+    );
     let guard = state.lock().await;
     let node = require_node(&guard)?;
     let delivered = node
         .invite_paired_device(&endpoint_id, &blob_ticket, file_count, total_size)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            tracing::warn!(
+                remote_endpoint = %endpoint_id,
+                error = %e,
+                "paired-invite: invite_paired_device command failed"
+            );
+            e.to_string()
+        })?;
+    tracing::info!(
+        remote_endpoint = %endpoint_id,
+        delivered,
+        "paired-invite: invite_paired_device command finished"
+    );
     Ok(InviteDelivered { delivered })
 }
 

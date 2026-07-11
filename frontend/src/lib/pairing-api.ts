@@ -94,11 +94,18 @@ export async function invitePairedDevice(
 	totalSize: number
 ): Promise<boolean> {
 	if (!desktopOnly()) return false
+	console.log('[paired-invite] sender: invoking invite_paired_device', {
+		endpointId,
+		fileCount,
+		totalSize,
+		ticketLen: blobTicket.length,
+	})
 	const result = await invoke<InviteDelivered>('invite_paired_device', {
 		endpointId,
 		blobTicket,
 		fileCount,
 		totalSize,
 	})
+	console.log('[paired-invite] sender: invite_paired_device returned', result)
 	return result.delivered
 }

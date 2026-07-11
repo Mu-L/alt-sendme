@@ -30,13 +30,24 @@ export function DeviceNodeSync() {
 			const inviteUnlisten = await listen(
 				'paired-invite-received',
 				(event: { payload: unknown }) => {
+					console.log('[paired-invite] receiver: event received', {
+						payloadType: typeof event.payload,
+						payloadPreview: String(event.payload).slice(0, 120),
+					})
 					try {
 						const payload = JSON.parse(
 							String(event.payload)
 						) as PairedInvitePayload
+						console.log('[paired-invite] receiver: parsed invite', {
+							sender: payload.sender_name,
+							fileCount: payload.file_count,
+							totalSize: payload.total_size,
+							remoteEndpointId: payload.remote_endpoint_id,
+							ticketLen: payload.blob_ticket.length,
+						})
 						setInvite(payload)
 					} catch (error) {
-						console.error('Failed to parse paired invite:', error)
+						console.error('[paired-invite] receiver: parse failed', error)
 					}
 				}
 			)
