@@ -104,7 +104,14 @@
 				"emptyTitle": "No paired devices yet",
 				"emptyHint": "Pair a phone or computer to send files without sharing a link each time.",
 				"pairDevice": "Pair device",
-				"nodeUnavailable": "Device sending is unavailable right now. You can still use One-time transfer from the other tab."
+				"nodeUnavailable": "Device sending is unavailable right now. You can still use One-time transfer from the other tab.",
+				"addDeviceTitle": "Add a device",
+				"addDeviceHint": "Copy the pairing code and paste it on the receiving device to pair before sending.",
+				"pairingCodeLabel": "Pairing code",
+				"pairingCodeReady": "Pairing code ready",
+				"copyPairingCode": "Copy pairing code",
+				"manageInSettings": "Manage devices in Settings",
+				"pairingUnavailable": "Could not start device pairing. You can still share via One-time transfer."
 			},
 			"link": {
 				"waiting": "Waiting for someone to use your link",
@@ -120,6 +127,10 @@
 		"receiveFromPairedDescriptionNoSize": "{{sender}} wants to send you {{count}} file(s). Accept to start downloading.",
 		"acceptInvite": "Accept",
 		"declineInvite": "Decline",
+		"pairedInvite": {
+			"saveTo": "Save to",
+			"changeFolder": "Change folder"
+		},
 		"receiveBusyTitle": "Download already in progress",
 		"receiveBusyDescription": "Wait for the current download to finish before accepting another file.",
 		"openReceiveTabHint": "Open the Receive tab once, then try again.",
@@ -127,11 +138,13 @@
 		"saveToFolder": "Save to folder:",
 		"saveLocation": "Save location:",
 		"noFolderSelected": "No folder selected",
+		"saveLocationHint": "Used for ticket downloads and files from paired devices.",
 		"browserDownloadsFallback": "Browser downloads folder",
 		"browserDownloadsHint": "This browser cannot pick a save folder. Files will download to your default downloads location.",
 		"conflictsMore": "... and {{count}} more",
-		"pasteTicket": "Paste the ticket here:",
-		"ticketPlaceholder": "AltSendme receive ticket...",
+		"pasteTicket": "One-time transfer",
+		"pasteTicketHint": "Paste a share link or ticket from someone who is not a paired device. Paired senders deliver files through the accept prompt instead.",
+		"ticketPlaceholder": "Paste one-time transfer ticket…",
 		"howToReceive": "How to receive files",
 		"instruction1": "Sender must be online and sharing a file",
 		"instruction2": "Get a ticket from the sender",
@@ -149,7 +162,16 @@
 		"downloadCompletedWithConflicts": "Download completed with name conflicts resolved",
 		"downloadedFile": "Downloaded File",
 		"stopReceiving": "Stop receiving",
-		"download": "Download"
+		"download": "Download",
+		"pairDevice": {
+			"title": "Pair with a sender",
+			"hint": "Paste the pairing code from the sharing device to connect before receiving files.",
+			"codeLabel": "Pairing code",
+			"placeholder": "Paste pairing code",
+			"pairButton": "Pair",
+			"pairing": "Pairing…",
+			"manageInSettings": "Manage devices in Settings"
+		}
 	},
 	"transfer": {
 		"progress": "Transfer Progress",

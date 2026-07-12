@@ -13,6 +13,7 @@ pub use identity::{
     default_device_type, default_display_name, detect_os, normalize_display_name, DeviceMetaFile,
     PairedDevice, PairedDeviceList,
 };
+pub use pairing::{pairing_host_is_persistent, PAIRING_VOTE_TIMEOUT_SECS};
 pub use pairing_auth::{export_connection_keying_material, sign_challenge, verify_challenge};
 pub use receive::{download_to_store, fetch_metadata, DownloadToStoreResult};
 pub use relay::{

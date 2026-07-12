@@ -314,6 +314,11 @@ pub async fn stop_sharing(state: State<'_, AppStateMutex>) -> Result<(), String>
         std::fs::remove_dir_all(&share._path);
     }
 
+    #[cfg(desktop)]
+    if let Some(node) = app_state.node.as_ref() {
+        node.stop_pairing_host().await;
+    }
+
     Ok(())
 }
 
@@ -830,12 +835,15 @@ fn require_node(guard: &crate::state::AppState) -> Result<&NodeService, String> 
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn start_pairing_host(state: State<'_, AppStateMutex>) -> Result<String, String> {
-    pairing_dev!("cmd.start_pairing_host");
+pub async fn start_pairing_host(
+    ttl_secs: Option<u64>,
+    state: State<'_, AppStateMutex>,
+) -> Result<String, String> {
+    pairing_dev!("cmd.start_pairing_host", ttl_secs = ?ttl_secs);
     let guard = state.lock().await;
     let node = require_node(&guard)?;
     let ticket = node
-        .start_pairing_host()
+        .start_pairing_host(ttl_secs)
         .await
         .map_err(|e| {
             pairing_dev_warn!("cmd.start_pairing_host.failed", error = %e);

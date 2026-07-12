@@ -69,11 +69,14 @@ export async function setDeviceDisplayName(
 	})
 }
 
-export async function startPairingHost(): Promise<string> {
+export async function startPairingHost(options?: {
+	ttlSecs?: number | null
+}): Promise<string> {
 	if (!desktopOnly()) {
 		throw new Error('Device pairing is only available on desktop')
 	}
-	return invoke<string>('start_pairing_host')
+	const ttlSecs = options?.ttlSecs ?? null
+	return invoke<string>('start_pairing_host', { ttlSecs })
 }
 
 export async function stopPairingHost(): Promise<void> {

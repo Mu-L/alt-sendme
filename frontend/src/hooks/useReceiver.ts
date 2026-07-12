@@ -645,11 +645,26 @@ export function useReceiver(): UseReceiverReturn {
 	const registerAcceptPairedInvite = useReceiverActionsStore(
 		(state) => state.registerAcceptPairedInvite
 	)
+	const registerBrowseSaveFolder = useReceiverActionsStore(
+		(state) => state.registerBrowseSaveFolder
+	)
+	const setReceiverSavePath = useReceiverActionsStore(
+		(state) => state.setReceiverSavePath
+	)
 
 	useEffect(() => {
 		registerAcceptPairedInvite(acceptPairedInvite)
 		return () => registerAcceptPairedInvite(null)
 	}, [acceptPairedInvite, registerAcceptPairedInvite])
+
+	useEffect(() => {
+		registerBrowseSaveFolder(handleBrowseFolder)
+		return () => registerBrowseSaveFolder(null)
+	}, [handleBrowseFolder, registerBrowseSaveFolder])
+
+	useEffect(() => {
+		setReceiverSavePath(savePath)
+	}, [savePath, setReceiverSavePath])
 
 	const resetForNewTransfer = async () => {
 		// Zero the seq first so in-flight events from the cancelled transfer are ignored.

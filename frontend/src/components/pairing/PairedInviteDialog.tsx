@@ -1,5 +1,7 @@
 import { useTranslation } from '@/i18n'
-import { IS_DESKTOP } from '@/lib/platform'
+import { IS_DESKTOP, IS_WEB } from '@/lib/platform'
+import { formatReceiveSavePath } from '@/lib/receive-save-path'
+import { supportsWebSaveLocationPicker } from '@/lib/platform-api'
 import { formatFileSize } from '@/lib/utils'
 import { usePairedInviteStore } from '@/store/paired-invite-store'
 import { useReceiverActionsStore } from '@/store/receiver-actions-store'
@@ -22,6 +24,8 @@ export function PairedInviteDialog() {
 	const acceptPairedInvite = useReceiverActionsStore(
 		(s) => s.acceptPairedInvite
 	)
+	const browseSaveFolder = useReceiverActionsStore((s) => s.browseSaveFolder)
+	const savePath = useReceiverActionsStore((s) => s.savePath)
 
 	const decline = () => {
 		setInvite(null)
@@ -55,7 +59,26 @@ export function PairedInviteDialog() {
 		}
 	}
 
+	const changeFolder = async () => {
+		if (!browseSaveFolder) {
+			toastManager.add({
+				title: t('common:errors.receiveFailed'),
+				description: t('common:receiver.openReceiveTabHint'),
+				type: 'warning',
+			})
+			return
+		}
+		await browseSaveFolder()
+	}
+
 	if (!IS_DESKTOP) return null
+
+	const canPickSaveLocation = IS_WEB ? supportsWebSaveLocationPicker() : true
+	const savePathDisplay = formatReceiveSavePath(savePath)
+	const noSaveLocationText =
+		IS_WEB && !canPickSaveLocation
+			? t('common:receiver.browserDownloadsFallback')
+			: t('common:receiver.noFolderSelected')
 
 	return (
 		<AlertDialog
@@ -84,6 +107,27 @@ export function PairedInviteDialog() {
 							: ''}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
+				<div className="space-y-2 px-6">
+					<p className="text-xs font-medium text-muted-foreground">
+						{t('common:receiver.pairedInvite.saveTo')}
+					</p>
+					<div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+						<p className="min-w-0 flex-1 truncate font-mono text-xs">
+							{savePathDisplay || noSaveLocationText}
+						</p>
+						{canPickSaveLocation ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="xs"
+								className="shrink-0"
+								onClick={changeFolder}
+							>
+								{t('common:receiver.pairedInvite.changeFolder')}
+							</Button>
+						) : null}
+					</div>
+				</div>
 				<AlertDialogFooter>
 					<AlertDialogClose
 						render={

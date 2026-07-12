@@ -128,7 +128,7 @@ export function usePairing() {
 		if (!IS_DESKTOP || !isNodeReady) return null
 		setIsLoading(true)
 		try {
-			const ticket = await startPairingHost()
+			const ticket = await startPairingHost({ ttlSecs: 120 })
 			setPairingTicket(ticket)
 			setHostExpiresIn(PAIRING_HOST_TTL_SECS)
 			return ticket

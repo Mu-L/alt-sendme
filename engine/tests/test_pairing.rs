@@ -34,6 +34,12 @@ fn pairing_auth_sign_and_verify() {
 }
 
 #[test]
+fn pairing_host_is_persistent_when_ttl_is_none() {
+    use engine::pairing_host_is_persistent;
+    assert!(pairing_host_is_persistent(None));
+    assert!(!pairing_host_is_persistent(Some(120)));
+}
+#[test]
 fn relay_and_addresses_preserves_relay_and_ip_addrs() {
     use engine::{apply_options, AddrInfoOptions};
     use iroh::{EndpointAddr, EndpointId, RelayUrl, TransportAddr};

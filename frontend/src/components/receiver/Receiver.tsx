@@ -15,6 +15,9 @@ import {
 } from '../ui/alert-dialog'
 import { ReceivingActiveCard } from './ReceivingActiveCard'
 import { TicketInput } from './TicketInput'
+import { ReceiveSaveLocationPicker } from './ReceiveSaveLocationPicker'
+import { IS_DESKTOP } from '@/lib/platform'
+import { ReceiverPairDevicePanel } from './ReceiverPairDevicePanel'
 import { Button } from '../ui/button'
 
 interface ReceiverProps {
@@ -74,14 +77,18 @@ export function Receiver({ onTransferStateChange }: ReceiverProps) {
 					</div>
 
 					<div className="space-y-4 flex-1 flex flex-col">
+						<ReceiveSaveLocationPicker
+							savePath={savePath}
+							disabled={isReceiving}
+							onBrowseFolder={handleBrowseFolder}
+						/>
+						{IS_DESKTOP ? <ReceiverPairDevicePanel /> : null}
 						<TicketInput
 							ticket={ticket}
 							isReceiving={isReceiving}
-							savePath={savePath}
 							previewMetadata={previewMetadata}
 							isPreviewLoading={isPreviewLoading}
 							onTicketChange={handleTicketChange}
-							onBrowseFolder={handleBrowseFolder}
 							onReceive={handleReceive}
 						/>
 					</div>

@@ -10,10 +10,8 @@ export interface ReceiverState {
 export interface TicketInputProps {
 	ticket: string
 	isReceiving: boolean
-	savePath: string
 	previewMetadata: TicketPreviewMetadata | null
 	isPreviewLoading: boolean
 	onTicketChange: (ticket: string) => void
-	onBrowseFolder: () => Promise<void>
 	onReceive: () => Promise<void>
 }

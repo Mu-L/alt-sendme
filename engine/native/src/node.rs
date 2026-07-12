@@ -80,6 +80,7 @@ struct ControlCtx {
     identity: Arc<DeviceIdentity>,
     paired_store: Arc<PairedDeviceStore>,
     access: Arc<RwLock<AccessState>>,
+    pairing_host_persistent: Arc<AtomicBool>,
     app_handle: AppHandle,
     home_relay_url: Option<String>,
 }
@@ -395,8 +396,20 @@ impl ControlProtocol {
         }
 
         if pairing_completed {
-            self.ctx.access.write().await.pairing_host_open = false;
-            pairing_dev!("host.close", local_endpoint = %local, reason = "pairing_complete");
+            let persistent = self
+                .ctx
+                .pairing_host_persistent
+                .load(Ordering::SeqCst);
+            if persistent {
+                pairing_dev!(
+                    "host.stay_open",
+                    local_endpoint = %local,
+                    reason = "persistent_pairing"
+                );
+            } else {
+                self.ctx.access.write().await.pairing_host_open = false;
+                pairing_dev!("host.close", local_endpoint = %local, reason = "pairing_complete");
+            }
             // Hold the session until the joiner reads our messages and disconnects.
             drop(send);
             drop(recv);
@@ -499,6 +512,7 @@ pub struct NodeService {
     paired_store: Arc<PairedDeviceStore>,
     access: Arc<RwLock<AccessState>>,
     pairing_host_open: Arc<AtomicBool>,
+    pairing_host_persistent: Arc<AtomicBool>,
     pairing_expire_task: Mutex<Option<JoinHandle<()>>>,
     app_handle: AppHandle,
     relay_mode: Mutex<RelayMode>,
@@ -537,11 +551,13 @@ impl NodeService {
             pairing_host_open: false,
         }));
         let pairing_host_open = Arc::new(AtomicBool::new(false));
+        let pairing_host_persistent = Arc::new(AtomicBool::new(false));
 
         let runtime = build_runtime(
             identity.clone(),
             paired_store.clone(),
             access.clone(),
+            pairing_host_persistent.clone(),
             app_handle.clone(),
             relay_mode.clone(),
         )
@@ -559,6 +575,7 @@ impl NodeService {
             paired_store,
             access,
             pairing_host_open,
+            pairing_host_persistent,
             pairing_expire_task: Mutex::new(None),
             app_handle,
             relay_mode: Mutex::new(relay_mode),
@@ -604,6 +621,7 @@ impl NodeService {
             self.identity.clone(),
             self.paired_store.clone(),
             self.access.clone(),
+            self.pairing_host_persistent.clone(),
             self.app_handle.clone(),
             relay_mode.clone(),
         )
@@ -694,34 +712,40 @@ impl NodeService {
         Ok(encoded)
     }
 
-    pub async fn start_pairing_host(&self) -> anyhow::Result<String> {
+    pub async fn start_pairing_host(&self, ttl_secs: Option<u64>) -> anyhow::Result<String> {
         pairing_dev!("host.open.start", local_endpoint = %self.identity.endpoint_id());
         self.stop_pairing_host().await;
 
+        let persistent = protocol::pairing::pairing_host_is_persistent(ttl_secs);
+        self.pairing_host_persistent
+            .store(persistent, Ordering::SeqCst);
         self.pairing_host_open.store(true, Ordering::SeqCst);
         self.access.write().await.pairing_host_open = true;
         pairing_dev!(
             "host.open.active",
             local_endpoint = %self.identity.endpoint_id(),
-            ttl_secs = protocol::pairing::PAIRING_VOTE_TIMEOUT_SECS
+            ttl_secs = ?ttl_secs,
+            persistent
         );
-        let access = self.access.clone();
-        let flag = self.pairing_host_open.clone();
-        let app_handle = self.app_handle.clone();
-        let handle = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(
-                protocol::pairing::PAIRING_VOTE_TIMEOUT_SECS,
-            ))
-            .await;
-            flag.store(false, Ordering::SeqCst);
-            access.write().await.pairing_host_open = false;
-            pairing_dev!("host.expired", reason = "ttl_elapsed");
-            if let Some(handle) = &app_handle {
-                pairing_dev!("host.emit_ui", event = "pairing-host-expired");
-                let _ = handle.emit_event("pairing-host-expired");
-            }
-        });
-        *self.pairing_expire_task.lock().await = Some(handle);
+
+        if let Some(ttl) = ttl_secs {
+            let access = self.access.clone();
+            let flag = self.pairing_host_open.clone();
+            let persistent_flag = self.pairing_host_persistent.clone();
+            let app_handle = self.app_handle.clone();
+            let handle = tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(ttl)).await;
+                flag.store(false, Ordering::SeqCst);
+                persistent_flag.store(false, Ordering::SeqCst);
+                access.write().await.pairing_host_open = false;
+                pairing_dev!("host.expired", reason = "ttl_elapsed");
+                if let Some(handle) = &app_handle {
+                    pairing_dev!("host.emit_ui", event = "pairing-host-expired");
+                    let _ = handle.emit_event("pairing-host-expired");
+                }
+            });
+            *self.pairing_expire_task.lock().await = Some(handle);
+        }
 
         let ticket = self.pairing_ticket()?;
         pairing_dev!(
@@ -737,6 +761,7 @@ impl NodeService {
             handle.abort();
             pairing_dev!("host.timer_aborted", local_endpoint = %self.identity.endpoint_id());
         }
+        self.pairing_host_persistent.store(false, Ordering::SeqCst);
         let was_open = self.pairing_host_open.swap(false, Ordering::SeqCst);
         self.access.write().await.pairing_host_open = false;
         if was_open {
@@ -1174,6 +1199,7 @@ async fn build_runtime(
     identity: Arc<DeviceIdentity>,
     paired_store: Arc<PairedDeviceStore>,
     access: Arc<RwLock<AccessState>>,
+    pairing_host_persistent: Arc<AtomicBool>,
     app_handle: AppHandle,
     relay_mode: RelayMode,
 ) -> anyhow::Result<NodeRuntime> {
@@ -1216,6 +1242,7 @@ async fn build_runtime(
             identity,
             paired_store,
             access,
+            pairing_host_persistent,
             app_handle,
             home_relay_url,
         },

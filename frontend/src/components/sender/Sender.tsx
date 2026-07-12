@@ -42,6 +42,9 @@ export function Sender({ onTransferStateChange }: SenderProps) {
 		isNodeReady,
 		pairedInviteStatus,
 		onInvitePairedDevice,
+		pairingTicket,
+		pairingCopySuccess,
+		onCopyPairingTicket,
 		handleFileSelect,
 		handleFilesSelect,
 		clearSelectedPath,
@@ -134,6 +137,9 @@ export function Sender({ onTransferStateChange }: SenderProps) {
 						isNodeReady={isNodeReady}
 						pairedInviteStatus={pairedInviteStatus}
 						onInvitePairedDevice={onInvitePairedDevice}
+						pairingTicket={pairingTicket}
+						pairingCopySuccess={pairingCopySuccess}
+						onCopyPairingTicket={onCopyPairingTicket}
 						onStartSharing={startSharing}
 						onStopSharing={stopSharing}
 						onCopyTicket={copyTicket}

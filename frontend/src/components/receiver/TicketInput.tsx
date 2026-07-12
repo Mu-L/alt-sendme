@@ -5,24 +5,8 @@ import { getPreviewFileIcon } from '../../lib/fileIcons'
 import { formatFileSize } from '../../lib/utils'
 import type { TicketInputProps } from '../../types/receiver'
 import type { TicketPreviewMetadata } from '../../types/transfer'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
-import { IS_ANDROID, IS_WEB } from '../../lib/platform'
-import { supportsWebSaveLocationPicker } from '../../lib/platform-api'
-
-const formatDisplayPath = (path: string | undefined | null) => {
-	if (!path) return ''
-
-	if (!IS_ANDROID) return path
-
-	const normalized = path.replace(/\\/g, '/')
-	const segments = normalized.split('/').filter(Boolean)
-
-	if (segments.length <= 2) return segments.join('/')
-
-	return segments.slice(-2).join('/')
-}
 
 const getThumbnailSrc = (thumbnail?: string) => {
 	if (!thumbnail) return null
@@ -168,60 +152,24 @@ function TicketPreviewCard({
 export function TicketInput({
 	ticket,
 	isReceiving,
-	savePath,
 	previewMetadata,
 	isPreviewLoading,
 	onTicketChange,
-	onBrowseFolder,
 	onReceive,
 }: TicketInputProps) {
 	const { t } = useTranslation()
 	const previewMetadataKey = previewMetadata
 		? JSON.stringify(previewMetadata)
 		: 'no-preview'
-	const canPickSaveLocation = IS_WEB ? supportsWebSaveLocationPicker() : true
-	const saveLocationLabel = IS_WEB
-		? t('common:receiver.saveLocation')
-		: t('common:receiver.saveToFolder')
-	const noSaveLocationText =
-		IS_WEB && !canPickSaveLocation
-			? t('common:receiver.browserDownloadsFallback')
-			: t('common:receiver.noFolderSelected')
-	const saveLocationHint =
-		IS_WEB && !canPickSaveLocation
-			? t('common:receiver.browserDownloadsHint')
-			: null
 
 	return (
 		<div className="space-y-4">
 			<div>
-				<p className="block text-sm font-medium mb-2">{saveLocationLabel}</p>
-				<InputGroup
-					onClick={canPickSaveLocation ? onBrowseFolder : undefined}
-					className={canPickSaveLocation ? undefined : 'cursor-default'}
-				>
-					<InputGroupInput
-						disabled
-						value={formatDisplayPath(savePath) || noSaveLocationText}
-					/>
-					{canPickSaveLocation ? (
-						<InputGroupAddon align="inline-end">
-							<Button disabled={isReceiving} size="xs">
-								{t('common:browse')}
-							</Button>
-						</InputGroupAddon>
-					) : null}
-				</InputGroup>
-				{saveLocationHint ? (
-					<p className="mt-1.5 text-xs text-muted-foreground">
-						{saveLocationHint}
-					</p>
-				) : null}
-			</div>
-
-			<div>
-				<p id="ticket-input-label" className="block text-sm font-medium mb-2">
+				<p id="ticket-input-label" className="block text-sm font-medium mb-1">
 					{t('common:receiver.pasteTicket')}
+				</p>
+				<p className="mb-2 text-xs text-muted-foreground">
+					{t('common:receiver.pasteTicketHint')}
 				</p>
 				<div className="flex gap-2 p-0.5">
 					<Textarea
@@ -243,14 +191,12 @@ export function TicketInput({
 				</div>
 			</div>
 
-			{/*Show loading state when fetching preview metadata */}
 			{isPreviewLoading && ticket.trim() && !previewMetadata ? (
 				<div className="p-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
 					{t('common:receiver.connectingToSender')}
 				</div>
 			) : null}
 
-			{/* Show preview if metadata is available*/}
 			{previewMetadata ? (
 				<TicketPreviewCard
 					key={previewMetadataKey}

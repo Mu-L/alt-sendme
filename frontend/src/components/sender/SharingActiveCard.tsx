@@ -27,18 +27,18 @@ export function SharingActiveCard({
 	pairedDevices = [],
 	isNodeReady = false,
 	pairedInviteStatus = {},
+	pairingTicket = null,
+	pairingCopySuccess = false,
 	onInvitePairedDevice,
+	onCopyPairingTicket,
 	onCopyTicket,
 	onStopSharing,
 	onSetBroadcast,
 }: SharingControlsProps) {
 	const { t } = useTranslation()
 
-	const hasDevices = IS_DESKTOP && pairedDevices.length > 0
-	const showTabs = IS_DESKTOP
-
 	const [activeTab, setActiveTab] = useState<SharingTab>(
-		hasDevices && !isBroadcastMode ? 'devices' : 'link'
+		!isBroadcastMode ? 'devices' : 'link'
 	)
 
 	// When a transfer starts (e.g. after inviting a paired device), surface the
@@ -72,6 +72,8 @@ export function SharingActiveCard({
 		/>
 	)
 
+	const showTabs = IS_DESKTOP
+
 	return (
 		<div className="flex flex-col h-full">
 			{showTabs ? (
@@ -98,7 +100,10 @@ export function SharingActiveCard({
 								pairedInviteStatus={pairedInviteStatus}
 								isNodeReady={isNodeReady}
 								hasTicket={Boolean(ticket)}
+								pairingTicket={pairingTicket}
+								pairingCopySuccess={pairingCopySuccess}
 								onInvitePairedDevice={onInvitePairedDevice}
+								onCopyPairingTicket={onCopyPairingTicket}
 							/>
 						</div>
 						<div className="shrink-0 border-t border-border pt-3 mt-4">
