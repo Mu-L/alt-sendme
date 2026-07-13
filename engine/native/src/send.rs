@@ -37,6 +37,8 @@ pub async fn start_share_items(
 
     ensure!(!paths.is_empty(), "no paths provided for sharing");
 
+    // Ephemeral endpoint: must not reuse the node's persistent identity while
+    // the control endpoint is online, or the relay rejects duplicate endpoint ids.
     let secret_key = get_or_create_secret()?;
     let relay_mode: RelayMode = options.relay_mode.clone().into();
     let mut builder = Endpoint::builder(presets::N0)

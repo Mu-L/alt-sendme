@@ -267,7 +267,9 @@ pub fn load_or_create_identity(data_dir: &Path) -> anyhow::Result<DeviceIdentity
 
     let outcome = identity_store::load_or_create_secret(data_dir)?;
     let secret = outcome.secret;
-    protocol::set_native_runtime_secret(secret.clone());
+    // Node identity is only for the persistent control endpoint. Share/receive
+    // sessions use ephemeral keys via get_or_create_secret() so they do not
+    // collide with this endpoint on the relay.
     let endpoint_id = HEXLOWER.encode(secret.public().as_bytes());
 
     if matches!(
