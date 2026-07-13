@@ -110,6 +110,10 @@ impl PairingTicket {
         let trimmed = s.trim();
         if let Ok(ticket) = serde_json::from_str::<Self>(trimmed) {
             anyhow::ensure!(ticket.kind == Self::KIND, "not a pairing ticket");
+            anyhow::ensure!(
+                is_endpoint_id_hex(&ticket.endpoint_id),
+                "invalid endpoint id in pairing ticket"
+            );
             return Ok(ticket);
         }
         // Allow bare endpoint id hex for manual entry.

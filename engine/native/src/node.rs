@@ -1824,6 +1824,24 @@ async fn send_forget_to_peer(
     write_message(&mut send, &forget)
         .await
         .context("forget write message")?;
+    let _ = send.finish();
+    // Hold the connection until the peer reads the message; dropping it
+    // immediately discards the unacked stream data.
+    match tokio::time::timeout(Duration::from_secs(5), conn.closed()).await {
+        Ok(closed) => pairing_flow!(
+            "forget",
+            "outbound",
+            "forget.notify.peer_closed",
+            remote_endpoint = %remote,
+            close_reason = ?closed
+        ),
+        Err(_) => pairing_flow!(
+            "forget",
+            "outbound",
+            "forget.notify.close_wait_timeout",
+            remote_endpoint = %remote
+        ),
+    }
     pairing_flow!(
         "forget",
         "outbound",

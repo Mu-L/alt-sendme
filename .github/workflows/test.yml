@@ -20,6 +20,10 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: './engine -> target'
+      # The root manifest only covers the `engine` package.
+      - name: Run protocol and native unit tests
+        run: cargo test --manifest-path engine/Cargo.toml -p sendme-protocol -p sendme-native
+        timeout-minutes: 10
       - name: Run engine E2E tests
         run: cargo test --manifest-path engine/Cargo.toml -- --test-threads=1
         timeout-minutes: 10
