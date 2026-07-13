@@ -9,7 +9,7 @@ export interface DeviceInfo {
 	os: string
 }
 
-export type PairingStatus = 'active' | 'unpaired-remotely'
+export type PairingStatus = 'active' | 'unpaired-remotely' | 'stale-local-identity'
 
 export interface PairedDevice {
 	endpoint_id: string

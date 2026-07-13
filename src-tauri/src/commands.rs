@@ -72,6 +72,7 @@ fn is_pairing_dev_event(event_name: &str) -> bool {
             | "paired-invite-received"
             | "paired-device-presence"
             | "device-unpaired"
+            | "identity-rotated"
     )
 }
 

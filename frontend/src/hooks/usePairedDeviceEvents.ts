@@ -21,6 +21,7 @@ export function usePairedDeviceEvents(options: {
 		let disposed = false
 		let unlistenPresence: (() => void) | undefined
 		let unlistenUnpaired: (() => void) | undefined
+		let unlistenIdentityRotated: (() => void) | undefined
 
 		const setup = async () => {
 			const presenceUnlisten = await listen('paired-device-presence', (event) => {
@@ -58,6 +59,15 @@ export function usePairedDeviceEvents(options: {
 			} else {
 				unlistenUnpaired = unpairedUnlisten
 			}
+
+			const identityRotatedUnlisten = await listen('identity-rotated', () => {
+				onRefresh()
+			})
+			if (disposed) {
+				identityRotatedUnlisten()
+			} else {
+				unlistenIdentityRotated = identityRotatedUnlisten
+			}
 		}
 
 		void setup()
@@ -66,6 +76,7 @@ export function usePairedDeviceEvents(options: {
 			disposed = true
 			unlistenPresence?.()
 			unlistenUnpaired?.()
+			unlistenIdentityRotated?.()
 		}
 	}, [onPresence, onUnpaired, onRefresh])
 }

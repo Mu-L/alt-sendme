@@ -54,11 +54,18 @@ pub enum PairingStatus {
     #[default]
     Active,
     UnpairedRemotely,
+    /// Local endpoint identity changed; peers still have the previous endpoint id.
+    StaleLocalIdentity,
 }
 
 impl PairingStatus {
     pub fn is_active(self) -> bool {
         matches!(self, Self::Active)
+    }
+
+    /// Devices that should keep outbound presence loops and allowlist entries.
+    pub fn is_connectable(self) -> bool {
+        matches!(self, Self::Active | Self::StaleLocalIdentity)
     }
 }
 

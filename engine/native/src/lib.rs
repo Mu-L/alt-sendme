@@ -2,6 +2,7 @@
 pub mod pairing_dev_log;
 pub mod device_identity;
 pub mod export;
+pub mod identity_store;
 pub mod import;
 pub mod node;
 pub mod paired_connections;

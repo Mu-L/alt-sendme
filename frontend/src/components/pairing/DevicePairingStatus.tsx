@@ -35,6 +35,20 @@ export function DevicePairingStatus({
 		)
 	}
 
+	if (device.pairing_status === 'stale-local-identity') {
+		return (
+			<span
+				className={cn(
+					'inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-500',
+					className
+				)}
+			>
+				<span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+				{t(`${prefix}.statusRePairRequired`)}
+			</span>
+		)
+	}
+
 	if (device.online) {
 		return (
 			<span

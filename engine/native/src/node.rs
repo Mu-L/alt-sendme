@@ -974,13 +974,31 @@ impl NodeService {
             );
         }
         if identity.identity_rotated {
+            let stale_count = paired_store
+                .mark_stale_after_local_identity_rotation()
+                .unwrap_or(0);
             pairing_dev_warn!(
                 "node.init.identity_rotated",
                 previous_endpoint = ?identity.previous_endpoint_id,
                 current_endpoint = %identity.endpoint_id(),
                 paired_device_count = paired_list.len(),
+                stale_device_count = stale_count,
                 hint = "peers paired with the previous endpoint_id cannot reach this device until re-paired"
             );
+            if stale_count > 0 {
+                if let Some(handle) = &app_handle {
+                    let payload = serde_json::json!({
+                        "previous_endpoint_id": identity.previous_endpoint_id,
+                        "current_endpoint_id": identity.endpoint_id(),
+                        "stale_device_count": stale_count,
+                    });
+                    pairing_dev!("node.emit_ui", event = "identity-rotated");
+                    let _ = handle.emit_event_with_payload(
+                        "identity-rotated",
+                        &payload.to_string(),
+                    );
+                }
+            }
         }
         let allowlist_ids: Vec<String> = allowed.iter().map(|id| id.to_string()).collect();
         pairing_dev!(
@@ -1742,7 +1760,7 @@ impl NodeService {
 fn load_allowed_from_store(paired_store: &PairedDeviceStore) -> anyhow::Result<HashSet<EndpointId>> {
     let mut allowed = HashSet::new();
     for device in paired_store.list()? {
-        if !device.pairing_status.is_active() {
+        if !device.pairing_status.is_connectable() {
             pairing_dev!(
                 "store.allowlist_skip",
                 endpoint_id = %device.endpoint_id,

@@ -190,10 +190,39 @@ pub fn get_or_create_secret() -> anyhow::Result<iroh::SecretKey> {
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        if let Some(secret) = native_runtime_secret::get() {
+            return Ok(secret);
+        }
         match std::env::var("IROH_SECRET") {
             Ok(secret) => iroh::SecretKey::from_str(&secret).context("invalid secret"),
-            Err(_) => Ok(iroh::SecretKey::generate()),
+            Err(_) => {
+                tracing::warn!(
+                    "get_or_create_secret: node identity not installed; using ephemeral key (share ticket will not match paired node identity)"
+                );
+                Ok(iroh::SecretKey::generate())
+            }
         }
+    }
+}
+
+/// Install the persistent node identity for ephemeral share/receive sessions on desktop.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn set_native_runtime_secret(key: iroh::SecretKey) {
+    native_runtime_secret::set(key);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+mod native_runtime_secret {
+    use std::sync::OnceLock;
+
+    static RUNTIME: OnceLock<iroh::SecretKey> = OnceLock::new();
+
+    pub fn set(key: iroh::SecretKey) {
+        let _ = RUNTIME.set(key);
+    }
+
+    pub fn get() -> Option<iroh::SecretKey> {
+        RUNTIME.get().cloned()
     }
 }
 

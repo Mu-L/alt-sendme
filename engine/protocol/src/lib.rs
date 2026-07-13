@@ -29,3 +29,5 @@ pub use types::*;
 
 #[cfg(target_arch = "wasm32")]
 pub use types::set_wasm_secret_key;
+#[cfg(not(target_arch = "wasm32"))]
+pub use types::set_native_runtime_secret;

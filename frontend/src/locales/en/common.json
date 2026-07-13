@@ -97,6 +97,7 @@
 			"statusOnline": "Online",
 			"statusOffline": "Offline",
 			"statusUnpaired": "Unpaired",
+			"statusRePairRequired": "Re-pair required",
 			"unknownPeer": "Unknown device"
 		},
 		"sharingActive": {
@@ -300,6 +301,7 @@
 			"statusOnline": "Online",
 			"statusOffline": "Offline",
 			"statusUnpaired": "Unpaired",
+			"statusRePairRequired": "Re-pair required",
 			"unpairedHint": "This device removed the pairing. Remove it from your list.",
 			"deviceUnpairedToast": "{{name}} unpaired this device",
 			"copied": "Pairing code copied"

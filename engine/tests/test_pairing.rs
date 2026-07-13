@@ -31,6 +31,24 @@ fn paired_device_defaults_to_active_pairing_status() {
 }
 
 #[test]
+fn stale_local_identity_devices_are_connectable_but_not_active() {
+    let device = PairedDevice {
+        endpoint_id: "cc".to_string(),
+        display_name: "Stale".to_string(),
+        device_type: "desktop".to_string(),
+        os: "linux".to_string(),
+        paired_at: 1,
+        last_seen_at: 2,
+        relay_url: None,
+        pairing_status: PairingStatus::StaleLocalIdentity,
+    };
+    assert!(!device.pairing_status.is_active());
+    assert!(device.pairing_status.is_connectable());
+    let json = serde_json::to_string(&device).expect("serialize");
+    assert!(json.contains("stale-local-identity"));
+}
+
+#[test]
 fn unpaired_remotely_devices_are_not_active() {
     let device = PairedDevice {
         endpoint_id: "bb".to_string(),

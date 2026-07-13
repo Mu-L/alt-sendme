@@ -92,7 +92,7 @@ impl PairedConnectionManager {
         let total = devices.len();
         let active: Vec<PairedDevice> = devices
             .into_iter()
-            .filter(|d| d.pairing_status.is_active())
+            .filter(|d| d.pairing_status.is_connectable())
             .collect();
         let active_ids: std::collections::HashSet<String> = active
             .iter()

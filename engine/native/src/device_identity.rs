@@ -10,7 +10,7 @@ use protocol::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::secret_store;
+use crate::identity_store;
 
 #[derive(Debug)]
 pub struct DeviceIdentity {
@@ -208,6 +208,27 @@ impl PairedDeviceStore {
         Ok(saved)
     }
 
+    pub fn mark_stale_after_local_identity_rotation(&self) -> anyhow::Result<usize> {
+        let mut file = self.read_file()?;
+        let mut updated = 0usize;
+        for device in &mut file.devices {
+            if device.pairing_status == PairingStatus::Active {
+                device.pairing_status = PairingStatus::StaleLocalIdentity;
+                updated += 1;
+            }
+        }
+        if updated > 0 {
+            self.write_file(&file)?;
+            tracing::warn!(
+                target: "pairing-dev",
+                step = "store.mark_stale_local_identity",
+                count = updated,
+                "pairing-dev"
+            );
+        }
+        Ok(updated)
+    }
+
     fn read_file(&self) -> anyhow::Result<PairedDeviceList> {
         if !self.path.exists() {
             return Ok(PairedDeviceList::default());
@@ -244,8 +265,23 @@ pub fn load_or_create_identity(data_dir: &Path) -> anyhow::Result<DeviceIdentity
     std::fs::create_dir_all(data_dir)?;
     let meta_path = data_dir.join("device.json");
 
-    let secret = load_secret_key()?;
+    let outcome = identity_store::load_or_create_secret(data_dir)?;
+    let secret = outcome.secret;
+    protocol::set_native_runtime_secret(secret.clone());
     let endpoint_id = HEXLOWER.encode(secret.public().as_bytes());
+
+    if matches!(
+        outcome.source,
+        identity_store::SecretSource::KeychainMigrated | identity_store::SecretSource::Generated
+    ) {
+        tracing::info!(
+            target: "pairing-dev",
+            step = "identity.secret.persisted",
+            source = ?outcome.source,
+            endpoint_id = %endpoint_id,
+            "pairing-dev"
+        );
+    }
 
     let mut identity_rotated = false;
     let mut previous_endpoint_id = None;
@@ -256,7 +292,7 @@ pub fn load_or_create_identity(data_dir: &Path) -> anyhow::Result<DeviceIdentity
         if meta.endpoint_id.to_lowercase() != endpoint_id {
             identity_rotated = true;
             previous_endpoint_id = Some(meta.endpoint_id.clone());
-            tracing::warn!("device.json endpoint_id mismatch; syncing to keychain identity");
+            tracing::warn!("device.json endpoint_id mismatch; syncing to persisted identity");
             tracing::info!(
                 target: "pairing-dev",
                 step = "identity.endpoint_mismatch",
@@ -305,29 +341,6 @@ pub fn load_or_create_identity(data_dir: &Path) -> anyhow::Result<DeviceIdentity
         identity_rotated,
         previous_endpoint_id,
     })
-}
-
-fn load_secret_key() -> anyhow::Result<SecretKey> {
-    if let Ok(hex) = std::env::var("IROH_SECRET") {
-        return parse_secret_hex(&hex);
-    }
-    if let Some(hex) = secret_store::load_secret_hex()? {
-        return parse_secret_hex(&hex);
-    }
-    let secret = SecretKey::generate();
-    let hex = HEXLOWER.encode(&secret.to_bytes());
-    secret_store::save_secret_hex(&hex)?;
-    Ok(secret)
-}
-
-fn parse_secret_hex(hex: &str) -> anyhow::Result<SecretKey> {
-    let bytes = HEXLOWER
-        .decode(hex.trim().as_bytes())
-        .context("invalid IROH_SECRET hex")?;
-    anyhow::ensure!(bytes.len() == 32, "secret key must be 32 bytes");
-    let mut arr = [0u8; 32];
-    arr.copy_from_slice(&bytes);
-    Ok(SecretKey::from_bytes(&arr))
 }
 
 /// Serializable paired device for the frontend, including ephemeral presence.
