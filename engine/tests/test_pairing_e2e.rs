@@ -63,7 +63,7 @@ async fn e2e_pairing_lifecycle() {
     );
     assert_eq!(host.device_info().endpoint_id, host_id);
 
-    // --- Pair while the host window is open ---
+    // Pair while the host window is open.
     let ticket = host
         .start_pairing_host(Some(300))
         .await
@@ -111,7 +111,7 @@ async fn e2e_pairing_lifecycle() {
     })
     .await;
 
-    // --- Closed window: unknown peers must be rejected by the access hook ---
+    // With the window closed, unknown peers must be rejected.
     host.stop_pairing_host().await;
 
     let stranger_dir = tempfile::tempdir().expect("stranger dir");
@@ -130,7 +130,7 @@ async fn e2e_pairing_lifecycle() {
         "host must not store the rejected peer"
     );
 
-    // --- Forget propagates to the peer ---
+    // Forget propagates to the peer.
     joiner.forget_paired(&host_id).await.expect("forget host");
     assert_eq!(
         paired_status(&joiner, &host_id),

@@ -191,13 +191,11 @@ fn pairing_ticket_accepts_legacy_json_with_v_and_null_relay() {
 
 #[test]
 fn pairing_ticket_decode_rejects_invalid_input() {
-    // Wrong kind.
     let wrong_kind = format!(
         "{{\"kind\":\"share\",\"endpoint_id\":\"{}\"}}",
         "a".repeat(64)
     );
     assert!(PairingTicket::decode(&wrong_kind).is_err());
-    // Bare id too short / not hex.
     assert!(PairingTicket::decode(&"a".repeat(63)).is_err());
     assert!(PairingTicket::decode(&"g".repeat(64)).is_err());
     assert!(PairingTicket::decode("").is_err());
@@ -217,7 +215,6 @@ fn pairing_ticket_decode_rejects_json_with_invalid_endpoint_id() {
 
 #[test]
 fn pairing_ticket_accepts_json_with_base32_endpoint_id() {
-    // Endpoint ids also have a base32 form.
     let secret = SecretKey::generate();
     let b32 = data_encoding::BASE32_NOPAD.encode(secret.public().as_bytes());
     let json = format!("{{\"kind\":\"pair\",\"endpoint_id\":\"{b32}\"}}");
@@ -289,7 +286,6 @@ async fn control_message_framing_roundtrip() {
 async fn control_message_framing_rejects_oversized_and_bad_lengths() {
     use tokio::io::AsyncWriteExt;
 
-    // Over the 1 MiB cap.
     let (mut client, _server) = tokio::io::duplex(64 * 1024);
     let oversized = ControlMessage::Invite {
         blob_ticket: "x".repeat(1024 * 1024 + 1),
@@ -299,12 +295,10 @@ async fn control_message_framing_rejects_oversized_and_bad_lengths() {
     };
     assert!(write_message(&mut client, &oversized).await.is_err());
 
-    // Zero-length frame.
     let (mut client, mut server) = tokio::io::duplex(64 * 1024);
     client.write_all(&0u32.to_be_bytes()).await.unwrap();
     assert!(read_message(&mut server).await.is_err());
 
-    // Length prefix over the cap.
     let (mut client, mut server) = tokio::io::duplex(64 * 1024);
     client
         .write_all(&(2 * 1024 * 1024u32).to_be_bytes())
