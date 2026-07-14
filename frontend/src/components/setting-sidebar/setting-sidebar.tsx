@@ -25,8 +25,8 @@ import { settingSidebarConfig } from './config'
 
 const SETTINGS_NAV_TRANSITION = {
 	type: 'spring' as const,
-	stiffness: 200,
-	damping: 25,
+	stiffness: 500,
+	damping: 35,
 }
 
 function settingsNavValue(to: string) {

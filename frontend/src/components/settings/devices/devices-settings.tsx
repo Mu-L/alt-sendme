@@ -480,7 +480,7 @@ export function DevicesSettings() {
 															</div>
 															<div className="min-w-0">
 																<div className="flex min-w-0 items-center gap-1">
-																	<p className="font-medium truncate">
+																	<p className="text-sm font-medium truncate">
 																		{device.display_name}
 																	</p>
 																	{isActive ? (

@@ -93,8 +93,20 @@ export function PairedDevicesPanel({
 					const inviteStatus = pairedInviteStatus[device.endpoint_id]
 					const isActive = isPairedDeviceActive(device)
 					const isSending = inviteStatus === 'sending'
+					const anotherDeviceSelected = Object.entries(
+						pairedInviteStatus
+					).some(
+						([id, status]) =>
+							id !== device.endpoint_id &&
+							(status === 'sending' || status === 'sent')
+					)
 					const disabled =
-						!isNodeReady || !hasTicket || isSending || !isActive
+						!isNodeReady ||
+						!hasTicket ||
+						isSending ||
+						!isActive ||
+						anotherDeviceSelected ||
+						inviteStatus === 'sent'
 					return (
 						<li key={device.endpoint_id}>
 							<button

@@ -142,6 +142,12 @@ export function useSender(): UseSenderReturn {
 		void refreshPairedDevices()
 	}, [refreshPairedDevices])
 
+	useEffect(() => {
+		if (!ticket) {
+			setPairedInviteStatus({})
+		}
+	}, [ticket])
+
 	usePairedDeviceEvents({
 		onPresence: useCallback((payload) => {
 			applyPresencePatch(setPairedDevices, payload)
@@ -898,6 +904,13 @@ export function useSender(): UseSenderReturn {
 			return false
 		}
 		if (pairedInviteStatus[endpointId] === 'sending') return false
+		const anotherInviteInFlight = Object.entries(pairedInviteStatus).some(
+			([id, status]) =>
+				id !== endpointId && (status === 'sending' || status === 'sent')
+		)
+		if (anotherInviteInFlight || pairedInviteStatus[endpointId] === 'sent') {
+			return false
+		}
 
 		const device =
 			pairedDevices.find((d) => d.endpoint_id === endpointId) ?? null
@@ -926,7 +939,6 @@ export function useSender(): UseSenderReturn {
 					description: t('common:sender.pairedDevices.inviteSentDesc'),
 					type: 'success',
 				})
-				setTimeout(() => setInviteStatus(endpointId, null), 5000)
 				return true
 			}
 			setInviteStatus(endpointId, 'failed')
