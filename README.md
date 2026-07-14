@@ -76,26 +76,26 @@ The easiest way to get started is by downloading one of the following versions f
   </tr>
   <tr>
     <td>💻 <b>Windows (x64)</b></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_x64-setup.exe'>Setup.exe</a></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_x64_en-US.msi'>MSI</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64-setup.exe'>Setup.exe</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64_en-US.msi'>MSI</a></td>
     <td>~10 MB</td>
   </tr>
   <tr>
     <td>💻 <b>macOS (Universal)</b></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_universal.dmg'>AltSendme.dmg</a></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_aarch64.dmg'>Apple Silicon</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_x64.dmg'>Intel</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_universal.dmg'>AltSendme.dmg</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_aarch64.dmg'>Apple Silicon</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64.dmg'>Intel</a></td>
     <td>~15 MB</td>
   </tr>
   <tr>
     <td>💻 <b>Linux (amd64)</b></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_amd64.deb'>AltSendme.deb</a></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-0.5.0-1.x86_64.rpm'>.rpm</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme_0.5.0_amd64.AppImage'>AppImage</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_amd64.deb'>AltSendme.deb</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme-0.6.0-1.x86_64.rpm'>.rpm</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_amd64.AppImage'>AppImage</a></td>
     <td>~13 MB</td>
   </tr>
   <tr>
     <td>📱 <b>Android (arm64)</b></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-v0.5.0-arm64.apk'>AltSendme.apk</a></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-v0.5.0-armv7.apk'>armv7</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.5.0/AltSendme-v0.5.0-universal.apk'>universal</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme-v0.6.0-arm64.apk'>AltSendme.apk</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme-v0.6.0-armv7.apk'>armv7</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme-v0.6.0-universal.apk'>universal</a></td>
     <td>~50 MB</td>
   </tr>
   <tr>
@@ -274,7 +274,7 @@ Thank you for checking out this project! If you find it useful, consider giving 
 <!-- <div align="center" style="color: gray;"></div> -->
 
 [badge-website]: https://img.shields.io/badge/website-altsendme.com-orange
-[badge-version]: https://img.shields.io/badge/version-0.5.0-blue
+[badge-version]: https://img.shields.io/badge/version-0.6.0-blue
 [badge-discord]: https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white
 [badge-platforms]: https://img.shields.io/badge/platforms-macOS%2C%20Windows%2C%20Linux%2C%20Android%2C%20CLI%2C%20-green
 [badge-sponsor]: https://img.shields.io/badge/sponsor-ff69b4

@@ -42,47 +42,13 @@ jobs:
           node scripts/validate-version.js
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Generate release notes from commits
+      - name: Generate release notes
         id: release_notes
         shell: bash
         env:
           CURRENT_TAG: ${{ github.ref_name }}
-        run: |
-          git fetch --tags --force --prune origin
-
-          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -v "^${CURRENT_TAG}$" | head -n 1 || true)
-
-          if [ -z "$PREVIOUS_TAG" ]; then
-            echo "No previous tag found, showing all commits"
-            COMMIT_RANGE="HEAD"
-          else
-            echo "Comparing ${PREVIOUS_TAG}...${CURRENT_TAG}"
-            COMMIT_RANGE="${PREVIOUS_TAG}..HEAD"
-          fi
-
-          CHANGELOG=$(git log -50 ${COMMIT_RANGE} --pretty=format:"- %s (%h)" --no-merges)
-
-          {
-            echo "## What's Changed"
-            echo ""
-            if [ -z "$CHANGELOG" ]; then
-              echo "- Initial release"
-            else
-              echo "$CHANGELOG"
-            fi
-            echo ""
-            if [ -n "$PREVIOUS_TAG" ]; then
-              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${CURRENT_TAG}"
-            fi
-            echo ""
-            echo "---"
-            echo ""
-            echo "See the assets below to download and install this version."
-          } > release_notes.txt
-
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          cat release_notes.txt >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/generate-release-notes.js
 
       - name: Create or resolve draft GitHub release
         id: release
