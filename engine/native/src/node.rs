@@ -13,8 +13,8 @@ use iroh::protocol::{AcceptError, ProtocolHandler, Router};
 use iroh::{address_lookup::pkarr::PkarrPublisher, EndpointAddr, EndpointId, TransportAddr};
 use protocol::{
     apply_options, export_connection_keying_material, read_message, sign_challenge,
-    verify_challenge, write_message, AddrInfoOptions, AppHandle, ControlMessage, PairedDevice,
-    PairingStatus, RememberVote, CONTROL_ALPN, PRESENCE_CONNECT_TIMEOUT_SECS,
+    verify_challenge, write_message, AddrInfoOptions, AppHandle, ControlMessage, InviteResponse,
+    PairedDevice, PairingStatus, RememberVote, CONTROL_ALPN, PRESENCE_CONNECT_TIMEOUT_SECS,
 };
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -363,7 +363,17 @@ impl ControlProtocol {
                     }
                 }
                 ControlMessage::InviteResponse { response, .. } => {
+                    let response_str = match response {
+                        InviteResponse::Accepted => "accepted",
+                        InviteResponse::Declined => "declined",
+                    };
                     debug!(?response, "invite response from {remote}");
+                    crate::pairing_util::emit_paired_invite_response(
+                        &self.ctx.app_handle,
+                        &self.ctx.paired_store,
+                        &remote.to_string(),
+                        response_str,
+                    );
                 }
                 ControlMessage::Recognition { signature } => {
                     if verify_challenge(&remote, &keying, &signature) {
@@ -723,6 +733,27 @@ impl ControlProtocol {
                     file_count,
                     total_size,
                     &sender_name,
+                );
+            }
+            ControlMessage::InviteResponse { response, .. } => {
+                let response_str = match response {
+                    InviteResponse::Accepted => "accepted",
+                    InviteResponse::Declined => "declined",
+                };
+                pairing_flow!(
+                    "invite",
+                    direction_from_side(conn_side),
+                    "invite.response.received",
+                    remote = %remote,
+                    bi_index,
+                    response = %response_str,
+                    role = "sender"
+                );
+                crate::pairing_util::emit_paired_invite_response(
+                    &self.ctx.app_handle,
+                    &self.ctx.paired_store,
+                    &remote.to_string(),
+                    response_str,
                 );
             }
             ControlMessage::Recognition { signature } => {
@@ -1721,6 +1752,108 @@ impl NodeService {
             role = "sender"
         );
         Ok(true)
+    }
+
+    pub async fn respond_paired_invite(
+        &self,
+        remote_endpoint_id: &str,
+        accepted: bool,
+    ) -> anyhow::Result<()> {
+        let remote = EndpointId::from_str(remote_endpoint_id)?;
+        let response = if accepted {
+            InviteResponse::Accepted
+        } else {
+            InviteResponse::Declined
+        };
+        let response_str = if accepted { "accepted" } else { "declined" };
+
+        pairing_flow!(
+            "invite",
+            "outbound",
+            "invite.response.start",
+            remote_endpoint = %remote,
+            response = %response_str,
+            role = "receiver"
+        );
+
+        let access = self.access.read().await;
+        let in_allowlist = access.allowed.contains(&remote);
+        drop(access);
+        if !in_allowlist {
+            pairing_flow_warn!(
+                "invite",
+                "outbound",
+                "invite.response.abort_not_allowed",
+                remote_endpoint = %remote,
+                role = "receiver"
+            );
+            anyhow::bail!("unknown paired device");
+        }
+
+        let stored_relay = self
+            .paired_store
+            .get(remote_endpoint_id)?
+            .and_then(|d| d.relay_url);
+
+        let conn = match self
+            .paired_connections
+            .wait_for_connection(remote_endpoint_id, invite_wait_timeout())
+            .await
+        {
+            Some(conn) => conn,
+            None => {
+                pairing_flow!(
+                    "invite",
+                    "outbound",
+                    "invite.response.wait_session.miss",
+                    remote_endpoint = %remote,
+                    source = "fallback_connect",
+                    role = "receiver"
+                );
+                let runtime = self.runtime.lock().await;
+                let addr = build_control_connect_addr(
+                    &runtime.endpoint,
+                    remote,
+                    stored_relay.as_deref(),
+                    "invite",
+                );
+                let connect = tokio::time::timeout(
+                    Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
+                    runtime.endpoint.connect(addr, CONTROL_ALPN),
+                )
+                .await;
+                match connect {
+                    Ok(Ok(conn)) => conn,
+                    Ok(Err(err)) => {
+                        return Err(err).context("invite response connect failed");
+                    }
+                    Err(_) => anyhow::bail!("invite response connect timeout"),
+                }
+            }
+        };
+
+        let (mut send, _recv) = conn
+            .open_bi()
+            .await
+            .context("open bi stream for invite response")?;
+        let message = ControlMessage::InviteResponse {
+            session_id: String::new(),
+            response,
+        };
+        write_message(&mut send, &message)
+            .await
+            .context("write InviteResponse message")?;
+        let _ = send.finish();
+
+        pairing_flow!(
+            "invite",
+            "outbound",
+            "invite.response.sent",
+            remote_endpoint = %remote,
+            response = %response_str,
+            role = "receiver"
+        );
+        Ok(())
     }
 }
 

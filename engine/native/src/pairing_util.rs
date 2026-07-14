@@ -135,6 +135,57 @@ pub fn emit_paired_invite_received(
     }
 }
 
+/// Emit `paired-invite-response` so the sender UI can toast accept/decline.
+pub fn emit_paired_invite_response(
+    app_handle: &AppHandle,
+    paired_store: &PairedDeviceStore,
+    remote_endpoint_id: &str,
+    response: &str,
+) {
+    let display_name = paired_store
+        .get(remote_endpoint_id)
+        .ok()
+        .flatten()
+        .map(|d| d.display_name);
+    let payload = serde_json::json!({
+        "endpoint_id": remote_endpoint_id,
+        "display_name": display_name,
+        "response": response,
+    });
+    pairing_flow!(
+        "invite",
+        "inbound",
+        "invite.response.emit_ui.start",
+        remote = %remote_endpoint_id,
+        response = %response,
+        event = "paired-invite-response",
+        role = "sender"
+    );
+    let Some(handle) = app_handle else {
+        pairing_dev_warn!(
+            "invite.response.emit_ui_skipped",
+            remote = %remote_endpoint_id,
+            reason = "no_app_handle"
+        );
+        return;
+    };
+    match handle.emit_event_with_payload("paired-invite-response", &payload.to_string()) {
+        Ok(()) => pairing_flow!(
+            "invite",
+            "inbound",
+            "invite.response.emit_ui.ok",
+            remote = %remote_endpoint_id,
+            response = %response,
+            role = "sender"
+        ),
+        Err(err) => pairing_dev_warn!(
+            "invite.response.emit_ui_failed",
+            remote = %remote_endpoint_id,
+            error = %err
+        ),
+    }
+}
+
 pub fn set_presence(
     presence: &Arc<std::sync::RwLock<HashMap<String, bool>>>,
     app_handle: &AppHandle,

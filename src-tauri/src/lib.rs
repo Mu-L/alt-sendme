@@ -117,6 +117,8 @@ pub fn run() {
             rename_paired_device,
             #[cfg(desktop)]
             invite_paired_device,
+            #[cfg(desktop)]
+            respond_paired_invite,
         ])
         .setup(|app| {
             setup_common(app);

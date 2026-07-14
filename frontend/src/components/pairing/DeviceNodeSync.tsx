@@ -3,13 +3,19 @@ import { listen } from '@/lib/platform-api'
 import { IS_DESKTOP } from '@/lib/platform'
 import { getRelayConfigArg } from '@/lib/relay'
 import { reconfigureNodeRelay } from '@/lib/pairing-api'
-import type { PairedInvitePayload } from '@/lib/pairing-api'
+import type {
+	PairedInvitePayload,
+	PairedInviteResponsePayload,
+} from '@/lib/pairing-api'
 import { usePairedInviteStore } from '@/store/paired-invite-store'
 import { preloadPairingData } from '@/store/pairing-data-store'
 import { useNodeCapability } from '@/hooks/useNodeCapability'
+import { useTranslation } from '@/i18n'
+import { toastManager } from '../ui/toast'
 
 /** Syncs relay settings to the device node and listens for paired invites globally. */
 export function DeviceNodeSync() {
+	const { t } = useTranslation()
 	const { isNodeReady, refreshNodeStatus } = useNodeCapability()
 	const setInvite = usePairedInviteStore((s) => s.setInvite)
 	const didSyncRelay = useRef(false)
@@ -36,6 +42,7 @@ export function DeviceNodeSync() {
 
 		let disposed = false
 		let unlistenInvite: (() => void) | undefined
+		let unlistenResponse: (() => void) | undefined
 		let unlistenExpired: (() => void) | undefined
 
 		const setup = async () => {
@@ -69,6 +76,40 @@ export function DeviceNodeSync() {
 				unlistenInvite = inviteUnlisten
 			}
 
+			const responseUnlisten = await listen(
+				'paired-invite-response',
+				(event: { payload: unknown }) => {
+					try {
+						const payload = JSON.parse(
+							String(event.payload)
+						) as PairedInviteResponsePayload
+						if (payload.response !== 'declined') return
+						const name =
+							payload.display_name?.trim() ||
+							t('common:sender.pairedDevices.unknownPeer')
+						toastManager.add({
+							title: t('common:sender.pairedDevices.inviteDeclined', {
+								name,
+							}),
+							description: t(
+								'common:sender.pairedDevices.inviteDeclinedDesc'
+							),
+							type: 'warning',
+						})
+					} catch (error) {
+						console.error(
+							'[paired-invite] sender: response parse failed',
+							error
+						)
+					}
+				}
+			)
+			if (disposed) {
+				responseUnlisten()
+			} else {
+				unlistenResponse = responseUnlisten
+			}
+
 			const expiredUnlisten = await listen('pairing-host-expired', () => {
 				void refreshNodeStatus()
 			})
@@ -84,9 +125,10 @@ export function DeviceNodeSync() {
 		return () => {
 			disposed = true
 			unlistenInvite?.()
+			unlistenResponse?.()
 			unlistenExpired?.()
 		}
-	}, [setInvite, refreshNodeStatus])
+	}, [setInvite, refreshNodeStatus, t])
 
 	return null
 }

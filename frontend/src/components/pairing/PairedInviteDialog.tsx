@@ -4,6 +4,7 @@ import { IS_DESKTOP, IS_WEB } from '@/lib/platform'
 import { formatReceiveSavePath } from '@/lib/receive-save-path'
 import { supportsWebSaveLocationPicker } from '@/lib/platform-api'
 import { formatFileSize } from '@/lib/utils'
+import { respondPairedInvite } from '@/lib/pairing-api'
 import { usePairedInviteStore } from '@/store/paired-invite-store'
 import { useReceiverActionsStore } from '@/store/receiver-actions-store'
 import {
@@ -30,14 +31,28 @@ export function PairedInviteDialog() {
 	const browseSaveFolder = useReceiverActionsStore((s) => s.browseSaveFolder)
 	const savePath = useReceiverActionsStore((s) => s.savePath)
 
+	const notifyInviteResponse = (endpointId: string, accepted: boolean) => {
+		void respondPairedInvite(endpointId, accepted).catch((error) => {
+			console.warn('[paired-invite] receiver: respond failed', {
+				endpointId,
+				accepted,
+				error,
+			})
+		})
+	}
+
 	const decline = () => {
+		const current = usePairedInviteStore.getState().invite
+		if (!current) return
 		setInvite(null)
+		notifyInviteResponse(current.remote_endpoint_id, false)
 	}
 
 	const accept = async () => {
-		if (!invite) return
+		const current = usePairedInviteStore.getState().invite
+		if (!current) return
 		console.log('[paired-invite] receiver: dialog accept clicked', {
-			sender: invite.sender_name,
+			sender: current.sender_name,
 			hasHandler: Boolean(acceptPairedInvite),
 		})
 		if (!acceptPairedInvite) {
@@ -52,13 +67,13 @@ export function PairedInviteDialog() {
 			return
 		}
 
-		const payload = invite
 		setInvite(null)
+		notifyInviteResponse(current.remote_endpoint_id, true)
 		if (location.pathname !== '/') {
 			navigate('/')
 		}
 		try {
-			await acceptPairedInvite(payload)
+			await acceptPairedInvite(current)
 			console.log('[paired-invite] receiver: accept handler completed')
 		} catch (error) {
 			console.error('[paired-invite] receiver: accept handler failed', error)

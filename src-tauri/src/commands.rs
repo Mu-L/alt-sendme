@@ -69,6 +69,7 @@ fn is_pairing_dev_event(event_name: &str) -> bool {
         "device-paired"
             | "pairing-host-expired"
             | "paired-invite-received"
+            | "paired-invite-response"
             | "paired-device-presence"
             | "device-unpaired"
             | "identity-rotated"
@@ -957,6 +958,39 @@ pub async fn invite_paired_device(
         delivered
     );
     Ok(InviteDelivered { delivered })
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn respond_paired_invite(
+    endpoint_id: String,
+    accepted: bool,
+    state: State<'_, AppStateMutex>,
+) -> Result<(), String> {
+    pairing_dev!(
+        "cmd.respond_paired_invite",
+        remote_endpoint = %endpoint_id,
+        accepted
+    );
+    let guard = state.lock().await;
+    let node = require_node(&guard)?;
+    node.respond_paired_invite(&endpoint_id, accepted)
+        .await
+        .map_err(|e| {
+            pairing_dev_warn!(
+                "cmd.respond_paired_invite.failed",
+                remote_endpoint = %endpoint_id,
+                accepted,
+                error = %e
+            );
+            e.to_string()
+        })?;
+    pairing_dev!(
+        "cmd.respond_paired_invite.done",
+        remote_endpoint = %endpoint_id,
+        accepted
+    );
+    Ok(())
 }
 
 #[cfg(test)]

@@ -45,6 +45,12 @@ export interface PairedInvitePayload {
 	remote_endpoint_id: string
 }
 
+export interface PairedInviteResponsePayload {
+	endpoint_id: string
+	display_name?: string | null
+	response: 'accepted' | 'declined'
+}
+
 export interface InviteDelivered {
 	delivered: boolean
 }
@@ -157,6 +163,22 @@ export async function invitePairedDevice(
 	})
 	console.log('[paired-invite] sender: invite_paired_device returned', result)
 	return result.delivered
+}
+
+export async function respondPairedInvite(
+	endpointId: string,
+	accepted: boolean
+): Promise<void> {
+	if (!desktopOnly()) return
+	console.log('[paired-invite] receiver: invoking respond_paired_invite', {
+		endpointId,
+		accepted,
+	})
+	await invoke('respond_paired_invite', {
+		endpointId,
+		accepted,
+	})
+	console.log('[paired-invite] receiver: respond_paired_invite returned')
 }
 
 export function formatOsLabel(os: string | undefined | null): string {

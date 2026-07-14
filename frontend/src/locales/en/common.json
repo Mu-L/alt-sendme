@@ -92,6 +92,8 @@
 			"inviteSent": "Invite sent",
 			"inviteSentTo": "Invite sent to {{name}}",
 			"inviteSentDesc": "They can accept it to start downloading.",
+			"inviteDeclined": "{{name}} declined your invite",
+			"inviteDeclinedDesc": "You can send again when they are ready.",
 			"inviteFailed": "Could not reach device",
 			"deviceOffline": "Device is offline - use the manual ticket instead.",
 			"deviceUnreachable": "This device is still paired. Try again when it is online, or use the manual ticket. Both devices may need compatible relay settings.",

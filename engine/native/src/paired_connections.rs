@@ -9,8 +9,9 @@ use iroh::endpoint::Connection;
 use iroh::EndpointId;
 use protocol::{
     export_connection_keying_material, read_message, sign_challenge, verify_challenge,
-    write_message, ControlMessage, PairedDevice, CONTROL_ALPN, PAIRED_INVITE_WAIT_SECS,
-    PAIRED_RECONNECT_MAX_SECS, PAIRED_RECONNECT_MIN_SECS, PRESENCE_CONNECT_TIMEOUT_SECS,
+    write_message, ControlMessage, InviteResponse, PairedDevice, CONTROL_ALPN,
+    PAIRED_INVITE_WAIT_SECS, PAIRED_RECONNECT_MAX_SECS, PAIRED_RECONNECT_MIN_SECS,
+    PRESENCE_CONNECT_TIMEOUT_SECS,
 };
 use tokio::sync::{Mutex, Notify, OnceCell, RwLock};
 use tokio::task::JoinHandle;
@@ -20,7 +21,8 @@ use crate::pairing_dev_log::{
     direction_from_side, elapsed_ms, log_pairing_flow_error, peer_role_from_side,
 };
 use crate::pairing_util::{
-    build_control_connect_addr, control_message_kind, emit_paired_invite_received, set_presence,
+    build_control_connect_addr, control_message_kind, emit_paired_invite_received,
+    emit_paired_invite_response, set_presence,
 };
 use crate::{pairing_flow, pairing_flow_warn};
 use protocol::AppHandle;
@@ -658,6 +660,28 @@ impl PairedConnectionManager {
                         file_count,
                         total_size,
                         &sender_name,
+                    );
+                }
+                ControlMessage::InviteResponse { response, .. } => {
+                    let response_str = match response {
+                        InviteResponse::Accepted => "accepted",
+                        InviteResponse::Declined => "declined",
+                    };
+                    pairing_flow!(
+                        "invite",
+                        direction_from_side(side),
+                        "invite.response.received",
+                        remote = %remote_id,
+                        bi_index,
+                        response = %response_str,
+                        role = "sender",
+                        source = "outbound_session"
+                    );
+                    emit_paired_invite_response(
+                        &self.app_handle,
+                        &self.paired_store,
+                        &remote_id,
+                        response_str,
                     );
                 }
                 ControlMessage::Recognition { signature } => {

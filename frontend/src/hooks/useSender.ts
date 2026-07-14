@@ -188,6 +188,7 @@ export function useSender(): UseSenderReturn {
 		let unlistenFailed: UnlistenFn | undefined
 		let unlistenActiveCount: UnlistenFn | undefined
 		let unlistenDevicePaired: UnlistenFn | undefined
+		let unlistenInviteResponse: UnlistenFn | undefined
 
 		const safeUnlisten = (unlisten?: UnlistenFn) => {
 			if (unlisten) {
@@ -226,6 +227,36 @@ export function useSender(): UseSenderReturn {
 				nextUnlistenDevicePaired()
 			} else {
 				unlistenDevicePaired = nextUnlistenDevicePaired
+			}
+
+			const nextUnlistenInviteResponse = await listen(
+				'paired-invite-response',
+				(event: { payload: unknown }) => {
+					try {
+						const payload =
+							typeof event.payload === 'string'
+								? (JSON.parse(event.payload) as {
+										endpoint_id: string
+										response: string
+									})
+								: (event.payload as {
+										endpoint_id: string
+										response: string
+									})
+						if (!payload?.endpoint_id) return
+						setInviteStatus(payload.endpoint_id, null)
+					} catch (error) {
+						console.error(
+							'[paired-invite] sender: failed to parse invite response',
+							error
+						)
+					}
+				}
+			)
+			if (disposed) {
+				nextUnlistenInviteResponse()
+			} else {
+				unlistenInviteResponse = nextUnlistenInviteResponse
 			}
 
 			const nextUnlistenStart = await listen('transfer-started', () => {
@@ -613,11 +644,14 @@ export function useSender(): UseSenderReturn {
 			safeUnlisten(unlistenFailed)
 			safeUnlisten(unlistenActiveCount)
 			safeUnlisten(unlistenDevicePaired)
+			safeUnlisten(unlistenInviteResponse)
 			unlistenStart = undefined
 			unlistenProgress = undefined
 			unlistenComplete = undefined
 			unlistenFailed = undefined
 			unlistenActiveCount = undefined
+			unlistenDevicePaired = undefined
+			unlistenInviteResponse = undefined
 		}
 	}, [
 		setViewState,
@@ -626,6 +660,7 @@ export function useSender(): UseSenderReturn {
 		resetForBroadcast,
 		setActiveConnectionCount,
 		refreshPairedDevices,
+		setInviteStatus,
 	])
 
 	const handleFilesSelect = async (
