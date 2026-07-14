@@ -206,4 +206,9 @@ fn setup_common(app: &tauri::App) {
     if let Some(window) = app.handle().get_webview_window("main") {
         let _ = window.set_decorations(false);
     }
+
+    #[cfg(target_os = "windows")]
+    if let Some(window) = app.handle().get_webview_window("main") {
+        platform::windows::window::adjust_initial_window_size(&window);
+    }
 }
