@@ -5,8 +5,8 @@ use anyhow::Context;
 use data_encoding::HEXLOWER;
 use iroh::SecretKey;
 use protocol::{
-    default_device_type, default_display_name, detect_os, normalize_display_name, DeviceMetaFile,
-    PairedDevice, PairedDeviceList, PairingStatus,
+    default_device_type, default_display_name, detect_os, is_placeholder_display_name,
+    normalize_display_name, DeviceMetaFile, PairedDevice, PairedDeviceList, PairingStatus,
 };
 use serde::{Deserialize, Serialize};
 
@@ -256,9 +256,7 @@ pub fn load_or_create_identity(data_dir: &Path) -> anyhow::Result<DeviceIdentity
         // Refresh auto-detected hostname only when the user has not renamed.
         if !meta.name_is_custom {
             let detected = default_display_name();
-            if meta.display_name.trim().is_empty()
-                || meta.display_name.eq_ignore_ascii_case("altsendme")
-            {
+            if is_placeholder_display_name(&meta.display_name) {
                 meta.display_name = detected;
             }
         }

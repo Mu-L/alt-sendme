@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
 	SettingSidebarContent,
 	SettingSidebarCore,
@@ -13,15 +14,17 @@ import { cn } from '@/lib/utils'
 import { useSidebar } from '../ui/sidebar'
 
 export default function SettingSidebar() {
+	const { pathname } = useLocation()
 	const { isMobile, setOpenMobile } = useSidebar()
 
-	// On mobile, open the nav sheet as soon as settings is entered so users
-	// land on navigation rather than a settings section behind a closed panel.
+	// On mobile, open the nav sheet only for the settings root so users land on
+	// navigation. Deep links (e.g. Pair Device → /settings/devices) go straight
+	// to that page with the sheet closed.
 	useEffect(() => {
-		if (isMobile) {
+		if (isMobile && pathname === '/settings') {
 			setOpenMobile(true)
 		}
-	}, [isMobile, setOpenMobile])
+	}, [isMobile, pathname, setOpenMobile])
 
 	return (
 		<SettingSidebarRoot

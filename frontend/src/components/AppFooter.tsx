@@ -94,7 +94,7 @@ export function AppFooter() {
 									variant: 'outline',
 									size: 'sm',
 								}),
-								'pointer-events-none opacity-64'
+								'pointer-events-none opacity-64 text-xs sm:text-sm'
 							)}
 						>
 							<MonitorSmartphone />
@@ -103,10 +103,13 @@ export function AppFooter() {
 					) : (
 						<Link
 							to="/settings/devices"
-							className={buttonVariants({
-								variant: 'outline',
-								size: 'sm',
-							})}
+							className={cn(
+								buttonVariants({
+									variant: 'outline',
+									size: 'sm',
+								}),
+								'text-xs sm:text-sm'
+							)}
 						>
 							<MonitorSmartphone />
 							{t('common:sender.pairDevice')}

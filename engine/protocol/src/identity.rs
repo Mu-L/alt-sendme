@@ -109,15 +109,73 @@ pub fn detect_os() -> String {
     }
 }
 
+/// True when the stored name is a generic auto fallback the user never chose.
+pub fn is_placeholder_display_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("altsendme")
+        || trimmed.eq_ignore_ascii_case("altsendme device")
+        || trimmed.eq_ignore_ascii_case("android phone")
+        || trimmed.eq_ignore_ascii_case("android tablet")
+}
+
 pub fn default_display_name() -> String {
+    #[cfg(target_os = "android")]
+    if let Some(name) = android_default_display_name() {
+        return name;
+    }
+
     let raw = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
-        .unwrap_or_else(|_| "AltSendme Device".to_string());
+        .unwrap_or_else(|_| {
+            if cfg!(target_os = "android") {
+                "Android Phone".to_string()
+            } else {
+                "AltSendme Device".to_string()
+            }
+        });
     let trimmed = raw.trim_end_matches(".local").trim();
     if trimmed.is_empty() {
-        "AltSendme Device".to_string()
+        if cfg!(target_os = "android") {
+            "Android Phone".to_string()
+        } else {
+            "AltSendme Device".to_string()
+        }
     } else {
         trimmed.to_string()
+    }
+}
+
+#[cfg(target_os = "android")]
+fn android_default_display_name() -> Option<String> {
+    // Prefer the user-facing marketed name when OEMs expose it.
+    for key in [
+        "ro.product.marketname",
+        "ro.product.model",
+        "ro.product.name",
+        "net.hostname",
+    ] {
+        if let Some(value) = android_getprop(key) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() && !is_placeholder_display_name(trimmed) {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "android")]
+fn android_getprop(key: &str) -> Option<String> {
+    let output = std::process::Command::new("getprop").arg(key).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
     }
 }
 
@@ -298,7 +356,9 @@ fn windows_has_system_battery() -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{device_type_from_chassis, device_type_from_mac_model};
+    use super::{
+        device_type_from_chassis, device_type_from_mac_model, is_placeholder_display_name,
+    };
 
     #[test]
     fn chassis_maps_laptops_and_desktops() {
@@ -323,6 +383,17 @@ mod tests {
         assert_eq!(device_type_from_mac_model("MacPro7,1"), Some("desktop"));
         assert_eq!(device_type_from_mac_model("Mac13,1"), None); // ambiguous; needs battery
         assert_eq!(device_type_from_mac_model("Mac14,7"), None);
+    }
+
+    #[test]
+    fn placeholder_display_names() {
+        assert!(is_placeholder_display_name(""));
+        assert!(is_placeholder_display_name("  "));
+        assert!(is_placeholder_display_name("altsendme"));
+        assert!(is_placeholder_display_name("AltSendme Device"));
+        assert!(is_placeholder_display_name("Android Phone"));
+        assert!(!is_placeholder_display_name("Pixel 8"));
+        assert!(!is_placeholder_display_name("Tony's phone"));
     }
 }
 

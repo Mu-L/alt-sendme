@@ -360,36 +360,41 @@ export function DevicesSettings() {
 										{t('common:settings.devices.thisDeviceHint')}
 									</FrameDescription>
 								</div>
-								<div className="flex items-center gap-3">
-									<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-										<ThisDeviceIcon className="h-5 w-5" />
-									</div>
-									<div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
-										<div className="flex min-w-0 items-center gap-1">
-											<p className="font-medium truncate">
-												{thisDevice.display_name}
-											</p>
-											<Button
-												type="button"
-												variant="ghost"
-												size="icon-xs"
-												className="shrink-0 text-muted-foreground"
-												aria-label={t('common:settings.devices.rename')}
-												onClick={() => setRenameThisOpen(true)}
-											>
-												<Pencil className="size-3" />
-											</Button>
+								<div className="flex min-w-0 flex-col gap-3 overflow-hidden">
+									<div className="flex min-w-0 items-start gap-3">
+										<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+											<ThisDeviceIcon className="h-5 w-5" />
 										</div>
-										<p className="text-right font-medium">
+										<div className="min-w-0 flex-1">
+											<div className="flex min-w-0 items-center gap-1">
+												<p className="min-w-0 truncate font-medium">
+													{thisDevice.display_name}
+												</p>
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon-xs"
+													className="shrink-0 text-muted-foreground"
+													aria-label={t('common:settings.devices.rename')}
+													onClick={() => setRenameThisOpen(true)}
+												>
+													<Pencil className="size-3" />
+												</Button>
+											</div>
+											<p className="min-w-0 truncate text-xs text-muted-foreground">
+												{deviceSubtitle(thisDevice)}
+											</p>
+										</div>
+									</div>
+									{/* Full-width under the icon row on mobile so the ticket doesn't compete with the name. */}
+									<div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+										<p className="shrink-0 font-medium">
 											{t('common:settings.devices.pairingCode')}
 										</p>
-										<p className="min-w-0 truncate text-xs text-muted-foreground">
-											{deviceSubtitle(thisDevice)}
-										</p>
-										<div className="flex items-center justify-end gap-1">
+										<div className="flex min-w-0 items-center gap-1.5">
 											{displayPairingCode ? (
 												<span
-													className="inline-block max-w-64 truncate font-mono text-xs text-muted-foreground"
+													className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground sm:max-w-64 sm:flex-none sm:text-right"
 													title={displayPairingCode}
 												>
 													{displayPairingCode}
@@ -398,8 +403,8 @@ export function DevicesSettings() {
 											<Button
 												type="button"
 												variant="ghost"
-												size="icon-xs"
-												className="shrink-0 text-muted-foreground"
+												size="icon-sm"
+												className="shrink-0 text-muted-foreground sm:size-6"
 												disabled={isLoading}
 												aria-label={
 													copied
@@ -409,9 +414,9 @@ export function DevicesSettings() {
 												onClick={copyPairingCode}
 											>
 												{isLoading && !displayPairingCode ? (
-													<Loader2 className="size-3 animate-spin" />
+													<Loader2 className="size-4 animate-spin sm:size-3" />
 												) : (
-													<Copy className="size-3" />
+													<Copy className="size-4 sm:size-3" />
 												)}
 											</Button>
 										</div>
