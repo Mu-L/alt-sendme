@@ -294,21 +294,22 @@ impl PairedConnectionManager {
             .get()
             .context("paired connection manager runtime not attached")?;
 
-        let conn = {
+        // Clone the endpoint under the short-lived runtime lock, then connect
+        // outside it. Holding the mutex across connect timeouts serialized every
+        // presence reconnect and blocked pairing_ticket / Devices UI for ~8s
+        // per offline peer.
+        let endpoint = {
             let runtime = runtime.lock().await;
-            let addr = build_control_connect_addr(
-                &runtime.endpoint,
-                remote,
-                stored_relay
-            );
-            tokio::time::timeout(
-                Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
-                runtime.endpoint.connect(addr, CONTROL_ALPN),
-            )
-            .await
-            .context("paired connect timeout")?
-            .context("paired connect failed")?
+            runtime.endpoint.clone()
         };
+        let addr = build_control_connect_addr(&endpoint, remote, stored_relay);
+        let conn = tokio::time::timeout(
+            Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
+            endpoint.connect(addr, CONTROL_ALPN),
+        )
+        .await
+        .context("paired connect timeout")?
+        .context("paired connect failed")?;
         
         let keying = export_connection_keying_material(&conn).context("export keying")?;
 

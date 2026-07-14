@@ -756,17 +756,23 @@ fn require_node(guard: &crate::state::AppState) -> Result<&NodeService, String> 
 }
 
 #[cfg(desktop)]
+fn require_node_arc(guard: &crate::state::AppState) -> Result<Arc<NodeService>, String> {
+    guard.node.clone().ok_or_else(|| {
+        guard
+            .node_init_error
+            .clone()
+            .unwrap_or_else(|| "Device pairing is not available.".to_string())
+    })
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn get_pairing_ticket(state: State<'_, AppStateMutex>) -> Result<String, String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
-    let ticket = node.pairing_ticket().await.map_err(|e| {
-
-        e.to_string()
-    })?;
-
-    Ok(ticket)
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+    node.pairing_ticket().map_err(|e| e.to_string())
 }
 
 #[cfg(desktop)]
@@ -775,13 +781,14 @@ pub async fn start_pairing_host(
     ttl_secs: Option<u64>,
     state: State<'_, AppStateMutex>,
 ) -> Result<String, String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
-    let ticket = node.start_pairing_host(ttl_secs).await.map_err(|e| {
-
-        e.to_string()
-    })?;
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+    let ticket = node
+        .start_pairing_host(ttl_secs)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(ticket)
 }
@@ -789,9 +796,11 @@ pub async fn start_pairing_host(
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn stop_pairing_host(state: State<'_, AppStateMutex>) -> Result<(), String> {
-
-    let guard = state.lock().await;
-    if let Some(node) = guard.node.as_ref() {
+    let node = {
+        let guard = state.lock().await;
+        guard.node.clone()
+    };
+    if let Some(node) = node {
         node.stop_pairing_host().await;
     }
 
@@ -801,13 +810,13 @@ pub async fn stop_pairing_host(state: State<'_, AppStateMutex>) -> Result<(), St
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn join_pairing(ticket: String, state: State<'_, AppStateMutex>) -> Result<(), String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
-    node.join_pairing(&ticket).await.map_err(|e| {
-
-        e.to_string()
-    })?;
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+    node.join_pairing(&ticket)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -817,9 +826,10 @@ pub async fn join_pairing(ticket: String, state: State<'_, AppStateMutex>) -> Re
 pub async fn list_paired_devices(
     state: State<'_, AppStateMutex>,
 ) -> Result<Vec<PairedDeviceInfo>, String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
     let devices = node.list_paired().map_err(|e| e.to_string())?;
 
     Ok(devices)
@@ -831,13 +841,13 @@ pub async fn forget_paired_device(
     endpoint_id: String,
     state: State<'_, AppStateMutex>,
 ) -> Result<(), String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
-    node.forget_paired(&endpoint_id).await.map_err(|e| {
-
-        e.to_string()
-    })?;
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
+    node.forget_paired(&endpoint_id)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -856,16 +866,14 @@ pub async fn invite_paired_device(
     total_size: u64,
     state: State<'_, AppStateMutex>,
 ) -> Result<InviteDelivered, String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
     let delivered = node
         .invite_paired_device(&endpoint_id, &blob_ticket, file_count, total_size)
         .await
-        .map_err(|e| {
-
-            e.to_string()
-        })?;
+        .map_err(|e| e.to_string())?;
 
     Ok(InviteDelivered { delivered })
 }
@@ -877,15 +885,13 @@ pub async fn respond_paired_invite(
     accepted: bool,
     state: State<'_, AppStateMutex>,
 ) -> Result<(), String> {
-
-    let guard = state.lock().await;
-    let node = require_node(&guard)?;
+    let node = {
+        let guard = state.lock().await;
+        require_node_arc(&guard)?
+    };
     node.respond_paired_invite(&endpoint_id, accepted)
         .await
-        .map_err(|e| {
-
-            e.to_string()
-        })?;
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }

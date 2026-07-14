@@ -735,21 +735,25 @@ impl NodeService {
         Ok(())
     }
 
-    pub async fn pairing_ticket(&self) -> anyhow::Result<String> {
-
-        let runtime = self.runtime.lock().await;
-        let mut addr = runtime.endpoint.addr();
-        apply_options(&mut addr, AddrInfoOptions::Relay);
-        let relay_url = addr.relay_urls().next().map(|u| u.to_string());
+    /// Immediate pairing code from local identity. Never waits on presence or
+    /// relay probes — optional custom-relay hint is best-effort via try_lock.
+    pub fn pairing_ticket(&self) -> anyhow::Result<String> {
+        let relay_url = match self.runtime.try_lock() {
+            Ok(runtime) => {
+                let mut addr = runtime.endpoint.addr();
+                apply_options(&mut addr, AddrInfoOptions::Relay);
+                let url = addr.relay_urls().next().map(|u| u.to_string());
+                url
+            }
+            Err(_) => None,
+        };
         let ticket = protocol::PairingTicket {
             v: 1,
             kind: protocol::PairingTicket::KIND.to_string(),
             endpoint_id: self.identity.endpoint_id(),
-            relay_url: relay_url.clone(),
+            relay_url,
         };
-        let encoded = ticket.encode()?;
-
-        Ok(encoded)
+        ticket.encode()
     }
 
     pub async fn start_pairing_host(&self, ttl_secs: Option<u64>) -> anyhow::Result<String> {
@@ -781,7 +785,7 @@ impl NodeService {
             *self.pairing_expire_task.lock().await = Some(handle);
         }
 
-        let ticket = self.pairing_ticket().await?;
+        let ticket = self.pairing_ticket()?;
 
         Ok(ticket)
     }
@@ -810,14 +814,16 @@ impl NodeService {
             }
         }
 
-        let runtime = self.runtime.lock().await;
-        let conn = match runtime.endpoint.connect(addr, CONTROL_ALPN).await {
+        let endpoint = {
+            let runtime = self.runtime.lock().await;
+            runtime.endpoint.clone()
+        };
+        let conn = match endpoint.connect(addr, CONTROL_ALPN).await {
             Ok(conn) => conn,
             Err(err) => {
                 return Err(err).context("pairing connect failed");
             }
         };
-        drop(runtime);
 
         let keying = export_connection_keying_material(&conn)?;
 
@@ -921,23 +927,23 @@ impl NodeService {
                 conn
             }
             None => {
-
-                let runtime = self.runtime.lock().await;
+                let endpoint = {
+                    let runtime = self.runtime.lock().await;
+                    runtime.endpoint.clone()
+                };
                 let addr = build_control_connect_addr(
-                    &runtime.endpoint,
+                    &endpoint,
                     remote,
-                    stored_relay.as_deref()
+                    stored_relay.as_deref(),
                 );
 
                 let connect = tokio::time::timeout(
                     Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
-                    runtime.endpoint.connect(addr, CONTROL_ALPN),
+                    endpoint.connect(addr, CONTROL_ALPN),
                 )
                 .await;
-                drop(runtime);
                 match connect {
                     Ok(Ok(conn)) => {
-
                         let now = protocol::identity::unix_now_ms();
                         let _ = self.paired_store.touch(remote_endpoint_id, now);
                         set_presence(
@@ -945,18 +951,14 @@ impl NodeService {
                             &self.app_handle,
                             &self.paired_store,
                             remote_endpoint_id,
-                            true
+                            true,
                         );
                         conn
                     }
                     Ok(Err(_err)) => {
-
-
                         return Ok(false);
                     }
                     Err(_) => {
-
-
                         return Ok(false);
                     }
                 }
@@ -964,13 +966,8 @@ impl NodeService {
         };
 
         let (mut send, _recv) = match conn.open_bi().await {
-            Ok(streams) => {
-
-                streams
-            }
+            Ok(streams) => streams,
             Err(err) => {
-
-
                 return Err(err).context("open bi stream for invite");
             }
         };
@@ -1033,16 +1030,18 @@ impl NodeService {
         {
             Some(conn) => conn,
             None => {
-
-                let runtime = self.runtime.lock().await;
+                let endpoint = {
+                    let runtime = self.runtime.lock().await;
+                    runtime.endpoint.clone()
+                };
                 let addr = build_control_connect_addr(
-                    &runtime.endpoint,
+                    &endpoint,
                     remote,
-                    stored_relay.as_deref()
+                    stored_relay.as_deref(),
                 );
                 let connect = tokio::time::timeout(
                     Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
-                    runtime.endpoint.connect(addr, CONTROL_ALPN),
+                    endpoint.connect(addr, CONTROL_ALPN),
                 )
                 .await;
                 match connect {
@@ -1095,19 +1094,17 @@ async fn send_forget_to_peer(
 ) -> anyhow::Result<()> {
     let remote = EndpointId::from_str(endpoint_id)?;
 
-    let runtime_guard = runtime.lock().await;
-    let addr = build_control_connect_addr(
-        &runtime_guard.endpoint,
-        remote,
-        stored_relay
-    );
+    let endpoint = {
+        let runtime_guard = runtime.lock().await;
+        runtime_guard.endpoint.clone()
+    };
+    let addr = build_control_connect_addr(&endpoint, remote, stored_relay);
 
     let connect = tokio::time::timeout(
         Duration::from_secs(PRESENCE_CONNECT_TIMEOUT_SECS),
-        runtime_guard.endpoint.connect(addr, CONTROL_ALPN),
+        endpoint.connect(addr, CONTROL_ALPN),
     )
     .await;
-    drop(runtime_guard);
 
     let conn = match connect {
         Ok(Ok(conn)) => {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Copy, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
-import { motion } from 'motion/react'
 import { useTranslation } from '../../../i18n'
 import { usePairing } from '../../../hooks/usePairing'
 import { Button } from '../../ui/button'
@@ -270,13 +269,29 @@ export function DevicesSettings() {
 	}
 
 	const copyPairingCode = async () => {
-		const code = pairingCode ?? pairingTicket
-		if (!code) return
 		try {
-			await navigator.clipboard.writeText(code)
+			let code = pairingCode ?? pairingTicket
+			if (code) {
+				await navigator.clipboard.writeText(code)
+				setCopied(true)
+				window.setTimeout(() => setCopied(false), 2000)
+				// Open the pairing window in the background — never block copy.
+				void openHostPairing().catch((error) => {
+					console.error(error)
+					toastManager.add({
+						title: t('common:settings.devices.pairFailed'),
+						type: 'error',
+					})
+				})
+				return
+			}
+
+			// Code not hydrated yet: generate + open host, then copy.
+			const ticket = await openHostPairing()
+			if (!ticket) return
+			await navigator.clipboard.writeText(ticket)
 			setCopied(true)
 			window.setTimeout(() => setCopied(false), 2000)
-			await openHostPairing()
 		} catch (error) {
 			console.error(error)
 			toastManager.add({
@@ -298,18 +313,9 @@ export function DevicesSettings() {
 		hostExpiresIn != null && hostExpiresIn > 0 && !!pairingTicket
 
 	return (
-		<motion.div
-			initial={false}
-			animate={{ opacity: readyToPaint ? 1 : 0 }}
-			transition={{ duration: 0.05, ease: 'easeOut' }}
-			className="flex flex-col gap-4"
-		>
+		<div className="flex flex-col gap-4">
 			{!readyToPaint ? (
-				<div
-					aria-busy="true"
-					aria-label={t('common:loading')}
-					className="pointer-events-none"
-				>
+				<div aria-busy="true" aria-label={t('common:loading')}>
 					<Frame>
 						<FramePanel className="flex flex-col gap-6 min-h-48">
 							<div className="space-y-2">
@@ -317,6 +323,10 @@ export function DevicesSettings() {
 								<FrameDescription>
 									{t('common:settings.devices.description')}
 								</FrameDescription>
+							</div>
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+								<Loader2 className="h-4 w-4 animate-spin" />
+								{t('common:loading')}
 							</div>
 						</FramePanel>
 					</Frame>
@@ -350,45 +360,46 @@ export function DevicesSettings() {
 										{t('common:settings.devices.thisDeviceHint')}
 									</FrameDescription>
 								</div>
-								<div className="flex items-center justify-between gap-3">
-									<div className="flex min-w-0 items-center gap-3">
-										<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-											<ThisDeviceIcon className="h-5 w-5" />
-										</div>
-										<div className="min-w-0">
-											<div className="flex min-w-0 items-center gap-1">
-												<p className="font-medium truncate">
-													{thisDevice.display_name}
-												</p>
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon-xs"
-													className="shrink-0 text-muted-foreground"
-													aria-label={t('common:settings.devices.rename')}
-													onClick={() => setRenameThisOpen(true)}
-												>
-													<Pencil className="size-3" />
-												</Button>
-											</div>
-											<p className="text-xs text-muted-foreground truncate">
-												{deviceSubtitle(thisDevice)}
-											</p>
-										</div>
+								<div className="flex items-center gap-3">
+									<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+										<ThisDeviceIcon className="h-5 w-5" />
 									</div>
-									{displayPairingCode ? (
-										<div className="flex max-w-[50%] shrink-0 items-center gap-1">
-											<span
-												className="truncate font-mono text-xs text-muted-foreground"
-												title={displayPairingCode}
-											>
-												{displayPairingCode}
-											</span>
+									<div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
+										<div className="flex min-w-0 items-center gap-1">
+											<p className="font-medium truncate">
+												{thisDevice.display_name}
+											</p>
 											<Button
 												type="button"
 												variant="ghost"
-												size="icon-sm"
-												className="shrink-0"
+												size="icon-xs"
+												className="shrink-0 text-muted-foreground"
+												aria-label={t('common:settings.devices.rename')}
+												onClick={() => setRenameThisOpen(true)}
+											>
+												<Pencil className="size-3" />
+											</Button>
+										</div>
+										<p className="text-right font-medium">
+											{t('common:settings.devices.pairingCode')}
+										</p>
+										<p className="min-w-0 truncate text-xs text-muted-foreground">
+											{deviceSubtitle(thisDevice)}
+										</p>
+										<div className="flex items-center justify-end gap-1">
+											{displayPairingCode ? (
+												<span
+													className="inline-block max-w-64 truncate font-mono text-xs text-muted-foreground"
+													title={displayPairingCode}
+												>
+													{displayPairingCode}
+												</span>
+											) : null}
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon-xs"
+												className="shrink-0 text-muted-foreground"
 												disabled={isLoading}
 												aria-label={
 													copied
@@ -397,10 +408,14 @@ export function DevicesSettings() {
 												}
 												onClick={copyPairingCode}
 											>
-												<Copy className="w-4 h-4" />
+												{isLoading && !displayPairingCode ? (
+													<Loader2 className="size-3 animate-spin" />
+												) : (
+													<Copy className="size-3" />
+												)}
 											</Button>
 										</div>
-									) : null}
+									</div>
 								</div>
 
 								{hostWindowOpen ? (
@@ -589,6 +604,6 @@ export function DevicesSettings() {
 					) : null}
 				</>
 			)}
-		</motion.div>
+		</div>
 	)
 }
