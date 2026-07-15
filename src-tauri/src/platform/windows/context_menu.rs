@@ -1,3 +1,10 @@
+//! Windows Explorer "Send with AltSendme" shell verb registration.
+//!
+//! Registration is intentionally **per-user (HKCU)** so the settings toggle
+//! works without elevation. Older MSI builds wrote the same verb under **HKLM**,
+//! which overlays with HKCU — disabling only HKCU left the menu text visible
+//! (often without an icon). Unregister therefore clears both hives.
+
 #[cfg(target_os = "windows")]
 use anyhow::Context;
 #[cfg(target_os = "windows")]
@@ -5,7 +12,14 @@ use std::path::PathBuf;
 #[cfg(target_os = "windows")]
 use winreg::enums::*;
 #[cfg(target_os = "windows")]
-use winreg::RegKey;
+use winreg::{HKEY, RegKey};
+
+#[cfg(target_os = "windows")]
+const VERB_NAME: &str = "Send with AltSendme";
+
+/// Shell classes that host the context-menu verb.
+#[cfg(target_os = "windows")]
+const VERB_BASES: &[&str] = &["*", "Directory", "Directory\\Background"];
 
 #[cfg(target_os = "windows")]
 pub fn get_current_exe_path() -> anyhow::Result<PathBuf> {
@@ -13,78 +27,96 @@ pub fn get_current_exe_path() -> anyhow::Result<PathBuf> {
     Ok(dunce::canonicalize(exe).unwrap_or_else(|_| std::env::current_exe().unwrap()))
 }
 
+/// True if our verb is present in either HKCU or HKLM (any of the three class keys).
 #[cfg(target_os = "windows")]
 pub fn is_context_menu_registered() -> anyhow::Result<bool> {
-    let exe_path = get_current_exe_path()?;
-    let exe_str = exe_path
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("Invalid path"))?;
-
-    // Check if the command key matches our current executable
-    // We check just one, assuming they are in sync
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = "Software\\Classes\\*\\shell\\Send with AltSendme\\command";
-
-    if let Ok(key) = hkcu.open_subkey_with_flags(path, KEY_READ) {
-        if let Ok(command_val) = key.get_value::<String, _>("") {
-            // Check if command starts with our executable path
-            // The command is like: "C:\path\to\exe" "%1"
-            let expected_start = format!("\"{}\"", exe_str);
-            if command_val.starts_with(&expected_start) {
-                return Ok(true);
-            }
+    for &hive in &[HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
+        if verb_exists_in_hive(hive)? {
+            return Ok(true);
         }
     }
-
     Ok(false)
 }
 
 #[cfg(target_os = "windows")]
 pub fn register_context_menu() -> anyhow::Result<()> {
-    // Only register if not already registered or path mismatch
-    if is_context_menu_registered().unwrap_or(false) {
-        return Ok(());
-    }
-
     let exe_path = get_current_exe_path()?;
     let exe_str = exe_path
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Invalid path"))?;
-    // Use the first icon resource from the executable
     let icon_path = format!("{},0", exe_str);
 
-    // Register for Files (*)
-    write_registry_key("*", "Send with AltSendme", exe_str, &icon_path, "\"%1\"")?;
+    // Drop any machine-wide leftover first so HKCU is the sole source of truth.
+    // Best-effort: failure here is non-fatal if we can still write HKCU.
+    let _ = remove_verb_from_hive(HKEY_LOCAL_MACHINE);
 
-    // Register for Directories
-    write_registry_key(
-        "Directory",
-        "Send with AltSendme",
-        exe_str,
-        &icon_path,
-        "\"%1\"",
-    )?;
+    for &base in VERB_BASES {
+        let arg = if base == "Directory\\Background" {
+            "\"%V\""
+        } else {
+            "\"%1\""
+        };
+        write_registry_key(base, VERB_NAME, exe_str, &icon_path, arg)?;
+    }
 
-    // Register for Directory Backgrounds
-    write_registry_key(
-        "Directory\\Background",
-        "Send with AltSendme",
-        exe_str,
-        &icon_path,
-        "\"%V\"",
-    )?;
+    notify_shell_change();
+    Ok(())
+}
 
-    notify_icon_change();
+/// Remove the Explorer verb from HKCU and, when possible, HKLM.
+///
+/// When `allow_elevation` is true and machine-wide (HKLM) leftovers remain,
+/// prompts once via UAC so a settings toggle can fully clear older MSI keys.
+/// Startup sync should pass `false` to avoid surprising elevation prompts.
+#[cfg(target_os = "windows")]
+pub fn unregister_context_menu(allow_elevation: bool) -> anyhow::Result<()> {
+    // Always clear the user hive (this is what the toggle owns).
+    remove_verb_from_hive(HKEY_CURRENT_USER)
+        .context("failed to remove Explorer context menu from HKCU")?;
+
+    // Clear machine-wide leftovers from older MSI installs.
+    if verb_exists_in_hive(HKEY_LOCAL_MACHINE).unwrap_or(false) {
+        let removed = remove_verb_from_hive(HKEY_LOCAL_MACHINE).is_ok()
+            && !verb_exists_in_hive(HKEY_LOCAL_MACHINE).unwrap_or(false);
+
+        if !removed && allow_elevation {
+            remove_hklm_verb_elevated()?;
+        }
+
+        if verb_exists_in_hive(HKEY_LOCAL_MACHINE).unwrap_or(false) {
+            if allow_elevation {
+                anyhow::bail!(
+                    "Could not remove the machine-wide Explorer context menu. \
+                     Run AltSendme once as administrator and disable the option again, \
+                     or uninstall the app."
+                );
+            }
+            // Quiet path (startup sync): HKCU is clean; HKLM will be cleared on
+            // uninstall or the next explicit disable with elevation.
+            tracing::warn!(
+                "Explorer context menu still present under HKLM; will need elevation to remove"
+            );
+        }
+    }
+
+    notify_shell_change();
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
-pub fn unregister_context_menu() -> anyhow::Result<()> {
-    remove_registry_key("*", "Send with AltSendme")?;
-    remove_registry_key("Directory", "Send with AltSendme")?;
-    remove_registry_key("Directory\\Background", "Send with AltSendme")?;
-    notify_icon_change();
-    Ok(())
+fn verb_key_path(base: &str) -> String {
+    format!(r"Software\Classes\{}\shell\{}", base, VERB_NAME)
+}
+
+#[cfg(target_os = "windows")]
+fn verb_exists_in_hive(hive: HKEY) -> anyhow::Result<bool> {
+    let root = RegKey::predef(hive);
+    for &base in VERB_BASES {
+        if root.open_subkey(verb_key_path(base)).is_ok() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[cfg(target_os = "windows")]
@@ -95,21 +127,28 @@ fn write_registry_key(
     icon_path: &str,
     arg: &str,
 ) -> anyhow::Result<()> {
-    // HKCU\Software\Classes\{base}\shell\{name}\command
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = format!("Software\\Classes\\{}", base);
-    let classes = hkcu
-        .open_subkey_with_flags(&path, KEY_READ | KEY_WRITE)
-        .context(format!("failed to open HKCU\\{}", path))?;
+    let path = format!(r"Software\Classes\{}", base);
+    // create_subkey builds the Classes\* / Directory tree if missing.
+    let (classes, _) = hkcu
+        .create_subkey_with_flags(&path, KEY_READ | KEY_WRITE)
+        .with_context(|| format!(r"failed to open/create HKCU\{}", path))?;
 
-    let key_path = format!("shell\\{}", name);
-    // Use create_subkey which opens if exists or creates if not
+    let key_path = format!(r"shell\{}", name);
     let (shell_key, _) = classes
         .create_subkey(&key_path)
-        .context(format!("failed to create context menu key {}", key_path))?;
+        .with_context(|| format!("failed to create context menu key {}", key_path))?;
 
-    shell_key.set_value("MUIVerb", &name).ok();
-    shell_key.set_value("Icon", &icon_path).ok();
+    // Default value + MUIVerb both set to the display name for Explorer compatibility.
+    shell_key
+        .set_value("", &name)
+        .context("failed to set context menu display name")?;
+    shell_key
+        .set_value("MUIVerb", &name)
+        .context("failed to set MUIVerb")?;
+    shell_key
+        .set_value("Icon", &icon_path)
+        .context("failed to set Icon")?;
 
     let (cmd_key, _) = shell_key
         .create_subkey("command")
@@ -123,18 +162,105 @@ fn write_registry_key(
 }
 
 #[cfg(target_os = "windows")]
-fn remove_registry_key(base: &str, name: &str) -> anyhow::Result<()> {
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = format!("Software\\Classes\\{}\\shell", base);
-    if let Ok(shell_key) = hkcu.open_subkey_with_flags(&path, KEY_READ | KEY_WRITE) {
-        let _ = shell_key.delete_subkey_all(name);
+fn remove_verb_from_hive(hive: HKEY) -> anyhow::Result<()> {
+    let root = RegKey::predef(hive);
+    let mut errors: Vec<String> = Vec::new();
+
+    for &base in VERB_BASES {
+        let shell_path = format!(r"Software\Classes\{}\shell", base);
+        match root.open_subkey_with_flags(&shell_path, KEY_READ | KEY_WRITE) {
+            Ok(shell_key) => {
+                if let Err(e) = shell_key.delete_subkey_all(VERB_NAME) {
+                    // ERROR_FILE_NOT_FOUND (2) means already gone — treat as success.
+                    if e.raw_os_error() != Some(2) {
+                        errors.push(format!("{}: {}", shell_path, e));
+                    }
+                }
+            }
+            Err(e) => {
+                if e.raw_os_error() != Some(2) {
+                    errors.push(format!("open {}: {}", shell_path, e));
+                }
+            }
+        }
     }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!("{}", errors.join("; "))
+    }
+}
+
+/// Remove leftover HKLM verb keys via an elevated `reg delete` (one UAC prompt).
+#[cfg(target_os = "windows")]
+fn remove_hklm_verb_elevated() -> anyhow::Result<()> {
+    use windows::core::{HSTRING, PCWSTR, w};
+    use windows::Win32::Foundation::{CloseHandle, ERROR_CANCELLED, WAIT_OBJECT_0};
+    use windows::Win32::System::Threading::{WaitForSingleObject, INFINITE};
+    use windows::Win32::UI::Shell::{
+        ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
+
+    let deletes: String = VERB_BASES
+        .iter()
+        .map(|base| {
+            format!(
+                r#"reg delete "HKLM\SOFTWARE\Classes\{}\shell\{}" /f"#,
+                base, VERB_NAME
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" & ");
+
+    let params = HSTRING::from(format!("/C {}", deletes));
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOCLOSEPROCESS,
+        lpVerb: w!("runas"),
+        lpFile: w!("cmd.exe"),
+        lpParameters: PCWSTR(params.as_ptr()),
+        nShow: SW_HIDE.0 as i32,
+        ..Default::default()
+    };
+
+    let ok = unsafe { ShellExecuteExW(&mut info) };
+    if let Err(err) = ok {
+        if err.code() == windows::core::HRESULT::from_win32(ERROR_CANCELLED.0) {
+            anyhow::bail!("Administrator approval was cancelled");
+        }
+        anyhow::bail!(
+            "Failed to request elevation to remove context menu: {}",
+            err
+        );
+    }
+
+    if info.hProcess.is_invalid() {
+        anyhow::bail!("Elevated process did not return a handle");
+    }
+
+    unsafe {
+        let wait = WaitForSingleObject(info.hProcess, INFINITE);
+        let _ = CloseHandle(info.hProcess);
+        if wait != WAIT_OBJECT_0 {
+            anyhow::bail!("Timed out waiting for elevated context-menu cleanup");
+        }
+    }
+
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
-fn notify_icon_change() {
-    // Force icon cache refresh by calling ie4uinit.exe
+fn notify_shell_change() {
+    use windows::Win32::UI::Shell::{SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_IDLIST};
+
+    // Tell Explorer that file associations / shell verbs changed.
+    unsafe {
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None);
+    }
+
+    // Also refresh the icon cache (best-effort).
     let _ = std::process::Command::new("ie4uinit.exe")
         .arg("-show")
         .spawn();
@@ -142,14 +268,19 @@ fn notify_icon_change() {
 
 // Stubs for non-Windows platforms
 #[cfg(not(target_os = "windows"))]
-#[allow(dead_code)] // Stub function for API consistency, may be used when settings route is implemented
+#[allow(dead_code)]
 pub fn register_context_menu() -> anyhow::Result<()> {
     Ok(())
 }
 
-// Stub for non-Windows platforms
 #[cfg(not(target_os = "windows"))]
 #[allow(dead_code)]
-pub fn unregister_context_menu() -> anyhow::Result<()> {
+pub fn unregister_context_menu(_allow_elevation: bool) -> anyhow::Result<()> {
     Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
+pub fn is_context_menu_registered() -> anyhow::Result<bool> {
+    Ok(false)
 }

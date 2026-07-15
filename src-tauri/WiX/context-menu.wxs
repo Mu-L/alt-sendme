@@ -1,38 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Context-menu cleanup for the MSI uninstaller.
+
+  The app owns registration at runtime (HKCU) so the settings toggle can
+  enable/disable without elevation. Older builds wrote the same verb under
+  HKLM on install — those leftovers (and any HKCU keys from the app) are
+  removed on uninstall. We intentionally do NOT create the verb here.
+-->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <DirectoryRef Id="INSTALLDIR">
       <Component Id="ContextMenuRegistryFiles"
                  Guid="3C4F8A2B-7D19-4E5F-8B3A-C6D0E2F14975">
-        <RegistryKey Root="HKLM"
-                     Key="SOFTWARE\Classes\*\shell\Send with AltSendme"
-                     Action="createAndRemoveOnUninstall">
-          <RegistryValue Name="MUIVerb" Value="Send with AltSendme" Type="string" KeyPath="yes"/>
-          <RegistryValue Name="Icon"    Value="[INSTALLDIR]AltSendme.exe,0" Type="string"/>
-          <RegistryKey Key="command">
-            <RegistryValue Value="&quot;[INSTALLDIR]AltSendme.exe&quot; &quot;%1&quot;" Type="string"/>
-          </RegistryKey>
-        </RegistryKey>
+        <!-- KeyPath marker so the component is installed; no shell verb is created. -->
+        <RegistryValue Root="HKMU"
+                       Key="Software\n0des\AltSendme"
+                       Name="ContextMenuCleanup"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes"/>
 
-        <RegistryKey Root="HKLM"
-                     Key="SOFTWARE\Classes\Directory\shell\Send with AltSendme"
-                     Action="createAndRemoveOnUninstall">
-          <RegistryValue Name="MUIVerb" Value="Send with AltSendme" Type="string"/>
-          <RegistryValue Name="Icon"    Value="[INSTALLDIR]AltSendme.exe,0" Type="string"/>
-          <RegistryKey Key="command">
-            <RegistryValue Value="&quot;[INSTALLDIR]AltSendme.exe&quot; &quot;%1&quot;" Type="string"/>
-          </RegistryKey>
-        </RegistryKey>
+        <!-- Machine-wide leftovers from older MSI builds -->
+        <RemoveRegistryKey Root="HKLM"
+                           Key="SOFTWARE\Classes\*\shell\Send with AltSendme"
+                           Action="removeOnUninstall"/>
+        <RemoveRegistryKey Root="HKLM"
+                           Key="SOFTWARE\Classes\Directory\shell\Send with AltSendme"
+                           Action="removeOnUninstall"/>
+        <RemoveRegistryKey Root="HKLM"
+                           Key="SOFTWARE\Classes\Directory\Background\shell\Send with AltSendme"
+                           Action="removeOnUninstall"/>
 
-        <RegistryKey Root="HKLM"
-                     Key="SOFTWARE\Classes\Directory\Background\shell\Send with AltSendme"
-                     Action="createAndRemoveOnUninstall">
-          <RegistryValue Name="MUIVerb" Value="Send with AltSendme" Type="string"/>
-          <RegistryValue Name="Icon"    Value="[INSTALLDIR]AltSendme.exe,0" Type="string"/>
-          <RegistryKey Key="command">
-            <RegistryValue Value="&quot;[INSTALLDIR]AltSendme.exe&quot; &quot;%V&quot;" Type="string"/>
-          </RegistryKey>
-        </RegistryKey>
+        <!-- Per-user keys written by the in-app toggle -->
+        <RemoveRegistryKey Root="HKCU"
+                           Key="Software\Classes\*\shell\Send with AltSendme"
+                           Action="removeOnUninstall"/>
+        <RemoveRegistryKey Root="HKCU"
+                           Key="Software\Classes\Directory\shell\Send with AltSendme"
+                           Action="removeOnUninstall"/>
+        <RemoveRegistryKey Root="HKCU"
+                           Key="Software\Classes\Directory\Background\shell\Send with AltSendme"
+                           Action="removeOnUninstall"/>
       </Component>
     </DirectoryRef>
   </Fragment>

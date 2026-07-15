@@ -95,6 +95,9 @@
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      },
       "wix": {
         "language": "en-US",
         "fragmentPaths": [

@@ -633,15 +633,20 @@ pub async fn check_launch_intent(
 }
 
 #[tauri::command]
-pub async fn toggle_context_menu(enable: bool) -> Result<(), String> {
+pub async fn toggle_context_menu(
+    enable: bool,
+    #[allow(unused_variables)] allow_elevation: Option<bool>,
+) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         if enable {
             crate::platform::windows::context_menu::register_context_menu()
                 .map_err(|e| e.to_string())
         } else {
-            crate::platform::windows::context_menu::unregister_context_menu()
-                .map_err(|e| e.to_string())
+            crate::platform::windows::context_menu::unregister_context_menu(
+                allow_elevation.unwrap_or(true),
+            )
+            .map_err(|e| e.to_string())
         }
     }
     #[cfg(not(target_os = "windows"))]

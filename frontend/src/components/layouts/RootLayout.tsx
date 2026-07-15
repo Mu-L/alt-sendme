@@ -7,6 +7,7 @@ import { AppUpdater } from '../common/AppUpdater'
 import { DeviceNodeSync } from '../pairing/DeviceNodeSync'
 import { PairedInviteDialog } from '../pairing/PairedInviteDialog'
 import { ReceiverProvider } from '../receiver/ReceiverProvider'
+import { WindowsContextMenuSync } from '../settings/system-tray/context-menu-toggle'
 import {
 	IS_ANDROID,
 	IS_LINUX,
@@ -14,6 +15,7 @@ import {
 	IS_PAIRING_CAPABLE,
 	IS_TAURI,
 	IS_WEB,
+	IS_WINDOWS,
 } from '@/lib/platform'
 
 export function RootLayout() {
@@ -21,6 +23,7 @@ export function RootLayout() {
 	return (
 		<ReceiverProvider>
 			{IS_TAURI && !IS_ANDROID && <AppUpdater />}
+			{IS_WINDOWS && <WindowsContextMenuSync />}
 			{IS_PAIRING_CAPABLE && <DeviceNodeSync />}
 			{IS_PAIRING_CAPABLE && <PairedInviteDialog />}
 			<main
