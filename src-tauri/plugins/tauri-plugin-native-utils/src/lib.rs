@@ -41,6 +41,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::select_send_folder,
             commands::consume_share_intent,
             commands::cancel_job,
+            commands::export_to_tree,
         ])
         .setup(|app, api| {
             #[cfg(mobile)]

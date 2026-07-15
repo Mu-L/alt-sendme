@@ -64,3 +64,11 @@ impl<R: Runtime> NativeUtils<R> {
             .map_err(Into::into)
     }
 }
+
+impl<R: Runtime> NativeUtils<R> {
+    pub fn export_to_tree(&self, args: ExportToTreeArgs) -> crate::Result<ExportToTreeResult> {
+        self.0
+            .run_mobile_plugin("export_to_tree", args)
+            .map_err(Into::into)
+    }
+}

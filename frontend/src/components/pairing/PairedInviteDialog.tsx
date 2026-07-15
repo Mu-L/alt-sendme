@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from '@/i18n'
-import { IS_PAIRING_CAPABLE, IS_WEB } from '@/lib/platform'
+import { IS_ANDROID, IS_PAIRING_CAPABLE, IS_WEB } from '@/lib/platform'
 import { formatReceiveSavePath } from '@/lib/receive-save-path'
 import { supportsWebSaveLocationPicker } from '@/lib/platform-api'
 import { formatFileSize } from '@/lib/utils'
@@ -87,7 +87,9 @@ export function PairedInviteDialog() {
 	const noSaveLocationText =
 		IS_WEB && !canPickSaveLocation
 			? t('common:receiver.browserDownloadsFallback')
-			: t('common:receiver.noFolderSelected')
+			: IS_ANDROID
+				? t('common:receiver.appDownloadsDefault')
+				: t('common:receiver.noFolderSelected')
 
 	return (
 		<AlertDialog

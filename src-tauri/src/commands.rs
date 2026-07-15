@@ -309,6 +309,7 @@ pub async fn stop_sharing(state: State<'_, AppStateMutex>) -> Result<(), String>
 pub async fn receive_file(
     ticket: String,
     output_path: String,
+    tree_uri: Option<String>,
     relay: Option<RelayConfigArg>,
     state: State<'_, AppStateMutex>,
     app_handle: tauri::AppHandle,
@@ -316,10 +317,10 @@ pub async fn receive_file(
     use iroh_blobs::ticket::BlobTicket;
     use std::str::FromStr;
 
-    let output_dir = PathBuf::from(output_path);
+    let output_dir = resolve_receive_output_dir(&app_handle, output_path)?;
     let (relay_mode, fell_back_to_public) = resolve_relay_mode_with_fallback(relay).await?;
     let options = ReceiveOptions {
-        output_dir: Some(output_dir),
+        output_dir: Some(output_dir.clone()),
         relay_mode,
         magic_ipv4_addr: None,
         magic_ipv6_addr: None,
@@ -364,7 +365,6 @@ pub async fn receive_file(
     {
         let mut app_state = state.lock().await;
         if app_state.current_receive_cancel.is_some() {
-
             return Err(
                 "Already receiving a file. Wait for the current download to finish.".to_string(),
             );
@@ -395,7 +395,17 @@ pub async fn receive_file(
     }
 
     match result {
-        Ok(r) => Ok(r.message),
+        Ok(r) => {
+            #[cfg(target_os = "android")]
+            {
+                finalize_android_receive(&app_handle, &output_dir, tree_uri.as_deref())?;
+            }
+            #[cfg(not(target_os = "android"))]
+            {
+                let _ = tree_uri;
+            }
+            Ok(r.message)
+        }
         Err(e) if e.to_string() == "cancelled" => {
             // User-initiated cancellation — not an error from the UI's perspective.
             Err("cancelled".to_string())
@@ -407,14 +417,145 @@ pub async fn receive_file(
     }
 }
 
+#[cfg(target_os = "android")]
+fn finalize_android_receive(
+    app_handle: &tauri::AppHandle,
+    staging_dir: &Path,
+    tree_uri: Option<&str>,
+) -> Result<(), String> {
+    use tauri_plugin_native_utils::{ExportToTreeArgs, NativeUtilsExt};
+
+    let tree_uri = tree_uri.map(str::trim).filter(|uri| !uri.is_empty());
+
+    let Some(tree_uri) = tree_uri else {
+        emit_receive_download_fallback(app_handle, staging_dir, "private");
+        return Ok(());
+    };
+
+    let export_result = app_handle.native_utils().export_to_tree(ExportToTreeArgs {
+        tree_uri: tree_uri.to_string(),
+        source_dir: staging_dir.to_string_lossy().into_owned(),
+    });
+
+    match export_result {
+        Ok(result) => {
+            tracing::info!(
+                exported = result.exported_count,
+                conflicts = result.conflicts.len(),
+                "Exported received files to SAF tree"
+            );
+            if let Err(e) = std::fs::remove_dir_all(staging_dir) {
+                tracing::warn!(
+                    "Failed to clean staging dir after SAF export ({}): {}",
+                    staging_dir.display(),
+                    e
+                );
+            }
+            Ok(())
+        }
+        Err(e) => {
+            tracing::warn!("SAF export failed, keeping app-private files: {e}");
+            emit_receive_download_fallback(app_handle, staging_dir, "saf");
+            // Transfer itself succeeded — files remain in staging.
+            Ok(())
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+fn emit_receive_download_fallback(
+    app_handle: &tauri::AppHandle,
+    staging_dir: &Path,
+    reason: &str,
+) {
+    let payload = serde_json::json!({
+        "path": staging_dir.to_string_lossy(),
+        "reason": reason,
+    });
+    let _ = app_handle.emit("receive-download-fallback", payload);
+}
+
+fn resolve_receive_output_dir(
+    app_handle: &tauri::AppHandle,
+    output_path: String,
+) -> Result<PathBuf, String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = output_path;
+        return android_staging_receive_dir(app_handle);
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let output_dir = PathBuf::from(output_path.trim());
+        if output_dir.as_os_str().is_empty() {
+            return fallback_receive_dir(app_handle);
+        }
+
+        match ensure_dir_writable(&output_dir) {
+            Ok(()) => Ok(output_dir),
+            Err(error) => {
+                tracing::warn!(
+                    "Receive output dir not writable ({}): {}",
+                    output_dir.display(),
+                    error
+                );
+                Err("Selected download folder is not writable".to_string())
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+fn android_staging_receive_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let transfer_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let staging = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {e}"))?
+        .join("downloads")
+        .join(format!("recv-{transfer_id}"));
+    ensure_dir_writable(&staging)
+        .map_err(|e| format!("Failed to prepare staging download dir: {e}"))?;
+    Ok(staging)
+}
+
+#[cfg(not(target_os = "android"))]
+fn fallback_receive_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let fallback = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {e}"))?
+        .join("downloads");
+    ensure_dir_writable(&fallback)
+        .map_err(|e| format!("Failed to prepare fallback download dir: {e}"))?;
+    Ok(fallback)
+}
+
+fn ensure_dir_writable(dir: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    let probe_name = format!(
+        ".sendme_write_test_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    );
+    let probe_path = dir.join(probe_name);
+    std::fs::write(&probe_path, b"probe")?;
+    std::fs::remove_file(probe_path)?;
+    Ok(())
+}
+
 /// Cancel the currently active receive, if any.
 /// Partial data is preserved on disk so the transfer can be resumed.
 #[tauri::command]
 pub async fn cancel_receive(state: State<'_, AppStateMutex>) -> Result<(), String> {
-
     let mut app_state = state.lock().await;
     if let Some(tx) = app_state.current_receive_cancel.take() {
-
         // Sending () signals the download future to stop. If the receiver is
         // already gone (download finished first) this is a harmless no-op.
         let _ = tx.send(());

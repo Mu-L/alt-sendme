@@ -110,6 +110,9 @@ export function useReceiver(): UseReceiverReturn {
 	const [savePath, setSavePath] = useState('')
 	const downloadsPath = useAppSettingStore((state) => state.downloadsPath)
 	const setDownloadsPath = useAppSettingStore((state) => state.setDownloadsPath)
+	const downloadsUri = useAppSettingStore((state) => state.downloadsUri)
+	const setDownloadsUri = useAppSettingStore((state) => state.setDownloadsUri)
+	const downloadsUriRef = useRef(downloadsUri)
 	const [transferMetadata, setTransferMetadata] =
 		useState<TransferMetadata | null>(null)
 	const [transferProgress, setTransferProgress] =
@@ -203,6 +206,10 @@ export function useReceiver(): UseReceiverReturn {
 	useEffect(() => {
 		savePathRef.current = savePath
 	}, [savePath])
+
+	useEffect(() => {
+		downloadsUriRef.current = downloadsUri
+	}, [downloadsUri])
 
 	useEffect(() => {
 		const seq = ++previewRequestSeqRef.current
@@ -375,6 +382,39 @@ export function useReceiver(): UseReceiverReturn {
 				}
 			})
 
+			await registerListener('receive-download-fallback', (event: any) => {
+				if (!IS_ANDROID) return
+				try {
+					const payload = event.payload as
+						| string
+						| { path?: string; reason?: string }
+					const fallbackPath =
+						typeof payload === 'string'
+							? payload.trim()
+							: String(payload?.path ?? '').trim()
+					const reason =
+						typeof payload === 'object' ? payload?.reason : undefined
+					if (!fallbackPath) return
+					setSavePath(fallbackPath)
+					setTransferMetadata((prev) =>
+						prev ? { ...prev, downloadPath: fallbackPath } : prev
+					)
+					showAlert(
+						t('common:receiver.downloadFallbackTitle'),
+						reason === 'saf'
+							? t('common:receiver.downloadFallbackSafDescription', {
+									path: fallbackPath,
+								})
+							: t('common:receiver.downloadFallbackDescription', {
+									path: fallbackPath,
+								}),
+						'info'
+					)
+				} catch (error) {
+					console.error('Failed to handle download fallback notice:', error)
+				}
+			})
+
 			await registerListener('receive-conflicts', (event: any) => {
 				if (transferSeqRef.current === 0) return
 				try {
@@ -506,6 +546,7 @@ export function useReceiver(): UseReceiverReturn {
 				if (!response) return
 				selected = response.path
 				setDownloadsPath(selected)
+				setDownloadsUri(response.uri)
 			} else if (IS_WEB) {
 				if (!supportsWebSaveLocationPicker()) {
 					return
@@ -532,7 +573,7 @@ export function useReceiver(): UseReceiverReturn {
 				'error'
 			)
 		}
-	}, [isReceiving, setDownloadsPath, showAlert, t])
+	}, [isReceiving, setDownloadsPath, setDownloadsUri, showAlert, t])
 
 	const receiveWithTicket = useCallback(
 		async (ticketValue: string) => {
@@ -556,7 +597,7 @@ export function useReceiver(): UseReceiverReturn {
 				folderOpenTriggeredRef.current = false
 
 				let outputPath = savePathRef.current.trim()
-				if (!outputPath && !IS_WEB) {
+				if (!outputPath && !IS_WEB && !IS_ANDROID) {
 					outputPath = await downloadDir()
 					setSavePath(outputPath)
 					savePathRef.current = outputPath
@@ -565,6 +606,9 @@ export function useReceiver(): UseReceiverReturn {
 				await invoke<string>('receive_file', {
 					ticket: ticketValue.trim(),
 					outputPath,
+					treeUri: IS_ANDROID
+						? downloadsUriRef.current.trim() || null
+						: null,
 					relay: getRelayConfigArg(),
 				})
 			} catch (error) {

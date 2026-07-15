@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/react-i18next-compat'
 import { formatReceiveSavePath } from '@/lib/receive-save-path'
-import { IS_WEB } from '@/lib/platform'
+import { IS_ANDROID, IS_WEB } from '@/lib/platform'
 import { supportsWebSaveLocationPicker } from '@/lib/platform-api'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group'
 import { Button } from '../ui/button'
@@ -24,11 +24,15 @@ export function ReceiveSaveLocationPicker({
 	const noSaveLocationText =
 		IS_WEB && !canPickSaveLocation
 			? t('common:receiver.browserDownloadsFallback')
-			: t('common:receiver.noFolderSelected')
+			: IS_ANDROID
+				? t('common:receiver.appDownloadsDefault')
+				: t('common:receiver.noFolderSelected')
 	const saveLocationHint =
 		IS_WEB && !canPickSaveLocation
 			? t('common:receiver.browserDownloadsHint')
-			: null
+			: IS_ANDROID && !savePath
+				? t('common:receiver.appDownloadsHint')
+				: null
 
 	return (
 		<div>

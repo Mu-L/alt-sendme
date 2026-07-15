@@ -40,6 +40,12 @@ class CancelJobArgs(
     var channelId: Long = 0
 )
 
+@InvokeArg
+class ExportToTreeArgs {
+    var treeUri: String = ""
+    var sourceDir: String = ""
+}
+
 @Keep
 data class DownloadFolderSelectionResponse(
     val uri: String,
@@ -105,6 +111,23 @@ class NativeUtils(private val activity: Activity) : Plugin(activity) {
                 invoke.resolve()
             } catch (e: Exception) {
                 invoke.reject(e.message)
+            }
+        }
+    }
+
+    @Command
+    fun export_to_tree(invoke: Invoke) {
+        val args = invoke.parseArgs(ExportToTreeArgs::class.java)
+        scope.launch {
+            try {
+                val treeUri = Uri.parse(args.treeUri)
+                val sourceDir = File(args.sourceDir)
+                val result = exportDirectoryToTree(activity, treeUri, sourceDir)
+                invoke.resolveObject(result)
+            } catch (e: SecurityException) {
+                invoke.reject(e.message ?: "SAF permission denied")
+            } catch (e: Exception) {
+                invoke.reject(e.message ?: "Failed to export to selected folder")
             }
         }
     }

@@ -43,3 +43,11 @@ pub(crate) async fn cancel_job<R: Runtime>(
 ) -> Result<()> {
     app.native_utils().cancel_job(job)
 }
+
+#[command]
+pub(crate) async fn export_to_tree<R: Runtime>(
+    app: AppHandle<R>,
+    args: ExportToTreeArgs,
+) -> Result<ExportToTreeResult> {
+    app.native_utils().export_to_tree(args)
+}

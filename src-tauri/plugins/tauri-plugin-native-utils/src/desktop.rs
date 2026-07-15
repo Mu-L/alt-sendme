@@ -42,3 +42,9 @@ impl<R: Runtime> NativeUtils<R> {
         Err(crate::Error::UnsupportedPlafrormError)
     }
 }
+
+impl<R: Runtime> NativeUtils<R> {
+    pub fn export_to_tree(&self, _: ExportToTreeArgs) -> crate::Result<ExportToTreeResult> {
+        Err(crate::Error::UnsupportedPlafrormError)
+    }
+}
