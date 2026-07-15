@@ -77,7 +77,7 @@ The easiest way to get started is by downloading one of the following versions f
   <tr>
     <td>💻 <b>Windows (x64)</b></td>
     <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64-setup.exe'>Setup.exe</a></td>
-    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64_en-US.msi'>MSI</a></td>
+    <td><a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64_en-US.msi'>MSI</a>, <a href='https://github.com/tonyantony300/alt-sendme/releases/download/v0.6.0/AltSendme_0.6.0_x64-portable.zip'>Portable ZIP</a></td>
     <td>~10 MB</td>
   </tr>
   <tr>

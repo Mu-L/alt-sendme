@@ -381,7 +381,9 @@
 		"checkFailed": "Check Failed",
 		"checkFailedDesc": "Failed to check for updates",
 		"installFailed": "Installation Failed",
-		"installFailedDesc": "Failed to install update"
+		"installFailedDesc": "Failed to install update",
+		"portableTitle": "Portable build",
+		"portableDescription": "You're running the portable ZIP. Auto-update isn't available — download the latest portable build from GitHub Releases when you want to upgrade."
 	},
 	"android": {
 		"preparingFile": "Preparing file..."

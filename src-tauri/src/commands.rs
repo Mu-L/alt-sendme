@@ -656,6 +656,12 @@ pub async fn toggle_context_menu(
     }
 }
 
+/// True when running the Windows no-install ZIP layout (`.portable` marker).
+#[tauri::command]
+pub fn is_windows_portable() -> bool {
+    crate::platform::windows::portable::is_portable()
+}
+
 /// Helper function to calculate total size of a file or directory
 fn get_total_size(path: &Path) -> Result<u64, String> {
     if path.is_file() {

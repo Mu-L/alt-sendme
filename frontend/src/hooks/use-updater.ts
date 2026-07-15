@@ -10,8 +10,21 @@ import { check } from '@tauri-apps/plugin-updater'
 import { toastManager } from '../components/ui/toast'
 import { useTranslation } from '../i18n/react-i18next-compat'
 import { IS_WEB } from '../lib/platform'
+import { isWindowsPortableBuild } from './use-windows-portable'
 
 type UpdateInfo = Awaited<ReturnType<typeof check>>
+
+async function checkForDesktopUpdate(): Promise<UpdateInfo> {
+	if (IS_WEB) {
+		return null
+	}
+	// Portable ZIP users must download a new archive; applying the NSIS/MSI
+	// updater would install over / beside the extracted folder incorrectly.
+	if (await isWindowsPortableBuild()) {
+		return null
+	}
+	return check()
+}
 
 export const updaterQueryKeys = {
 	all: ['updater'] as const,
@@ -22,12 +35,7 @@ export const updaterQueryOptions = {
 	checkUpdate: () =>
 		queryOptions({
 			queryKey: updaterQueryKeys.checkUpdate(),
-			queryFn: async () => {
-				if (IS_WEB) {
-					return null
-				}
-				return check()
-			},
+			queryFn: async () => checkForDesktopUpdate(),
 			retry: 1,
 		}),
 }
@@ -66,13 +74,7 @@ export const useCheckForUpdatesMutation = () => {
 	const { t } = useTranslation()
 
 	return useMutation({
-		mutationFn: async () => {
-			if (IS_WEB) {
-				return null
-			}
-			const update = await check()
-			return update
-		},
+		mutationFn: async () => checkForDesktopUpdate(),
 		onError: (error: Error) => {
 			console.error('Failed to check for updates:', error)
 			toastManager.add({
@@ -90,10 +92,7 @@ export const useInstallUpdateMutation = () => {
 
 	return useMutation({
 		mutationFn: async () => {
-			if (IS_WEB) {
-				return
-			}
-			const update = await check()
+			const update = await checkForDesktopUpdate()
 			if (update) {
 				await update.downloadAndInstall()
 				await relaunch()

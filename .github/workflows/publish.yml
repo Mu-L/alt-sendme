@@ -284,6 +284,17 @@ jobs:
           uploadUpdaterJson: true
           retryAttempts: 8
 
+      - name: Package Windows portable ZIP
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: node scripts/package-windows-portable.js
+
       - name: Patch Linux .deb dependencies (ubuntu only)
         if: contains(matrix.platform, 'ubuntu')
         shell: bash

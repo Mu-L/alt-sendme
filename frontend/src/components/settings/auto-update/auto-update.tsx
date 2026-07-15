@@ -16,6 +16,7 @@ import {
 	useCheckForUpdatesMutation,
 	useInstallUpdateMutation,
 } from '../../../hooks/use-updater'
+import { useIsWindowsPortable } from '../../../hooks/use-windows-portable'
 import { toastManager } from '../../ui/toast'
 
 export function AutoUpdate() {
@@ -23,6 +24,7 @@ export function AutoUpdate() {
 	const value = useAppSettingStore((r) => r.autoUpdate)
 	const toggle = useAppSettingStore((r) => r.setAutoUpdate)
 	const [isOpen, setIsOpen] = useState(false)
+	const { data: isPortable = false } = useIsWindowsPortable()
 
 	const checkForUpdates = useCheckForUpdatesMutation()
 	const handleUpdate = useInstallUpdateMutation()
@@ -49,6 +51,19 @@ export function AutoUpdate() {
 				setIsOpen(false)
 			},
 		})
+	}
+
+	if (isPortable) {
+		return (
+			<Frame>
+				<FramePanel>
+					<FrameTitle>{t('updater.portableTitle')}</FrameTitle>
+					<FrameDescription>
+						{t('updater.portableDescription')}
+					</FrameDescription>
+				</FramePanel>
+			</Frame>
+		)
 	}
 
 	return (

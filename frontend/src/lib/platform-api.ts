@@ -254,6 +254,8 @@ function invokeWebStub<T>(cmd: string, args?: Record<string, unknown>): T {
 		case 'plugin:native-utils|cancel_job':
 		case 'plugin:native-utils|open_download_folder':
 			return null as T
+		case 'is_windows_portable':
+			return false as T
 		default:
 			console.warn(`[web] unhandled invoke: ${cmd}`)
 			throw new WebPreviewError()

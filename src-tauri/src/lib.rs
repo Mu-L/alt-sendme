@@ -93,6 +93,7 @@ pub fn run() {
             verify_relays,
             get_relay_status,
             toggle_context_menu,
+            is_windows_portable,
             #[cfg(any(desktop, target_os = "android"))]
             get_node_status,
             #[cfg(any(desktop, target_os = "android"))]
