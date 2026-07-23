@@ -68,7 +68,7 @@ jobs:
             RELEASE_ID=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name="${TAG}" \
               -f target_commitish="${GITHUB_SHA}" \
-              -f name="AltSendme ${VERSION}" \
+              -f name="DashBeam ${VERSION}" \
               -f body="$(cat release_notes.txt)" \
               -F draft=true \
               -F prerelease=false \
@@ -453,7 +453,7 @@ jobs:
               ls -la "$(dirname "$APK")" 2>&1 || true
               exit 1
             fi
-            RENAME="AltSendme-${TAG}-${variant}.apk"
+            RENAME="DashBeam-${TAG}-${variant}.apk"
             cp "$APK" "$RENAME"
             echo "Uploading $RENAME to release $TAG"
             ASSET_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets" \
