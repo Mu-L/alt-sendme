@@ -1,3 +1,5 @@
+<img src="assets/rename-banner.svg" alt="Announcement: AltSendme is now DashBeam. Same app, easier to find, remember and pronounce." width="1200" />
+
 <div align="center">
 
 # File transfer doesn't need to be complicated
@@ -23,9 +25,8 @@
 [![Sponsor][badge-sponsor]](https://github.com/sponsors/tonyantony300)
 
 
+
 </div>
-
-
 
 A free and open-source file transfer tool that harnesses the power of [cutting-edge peer-to-peer networking](https://www.iroh.computer), letting you transfer files directly without storing them on cloud servers.
 
@@ -100,19 +101,19 @@ The easiest way to get started is by downloading one of the following versions f
   </tr>
   <tr>
     <td>⌨️ <b>CLI</b></td>
-    <td><a href='https://www.altsendme.com/en/downloads'>Downloads</a></td>
+    <td><a href='https://www.dashbeam.net/en/downloads'>Downloads</a></td>
     <td>-</td>
     <td>~4-5 MB</td>
   </tr>
   <tr>
     <td>🌐 <b>Web (Limited throughput)</b></td>
-    <td><a href='https://app.altsendme.com'>app.altsendme.com</a></td>
+    <td><a href='https://app.dashbeam.net'>app.dashbeam.net</a></td>
     <td>-</td>
     <td>~2 MB</td>
   </tr>
 </table>
 
-More options at [GitHub Releases](https://github.com/tonyantony300/dashbeam/releases) or in [Downloads](https://www.altsendme.com/en/downloads) page.
+More options at [GitHub Releases](https://github.com/tonyantony300/dashbeam/releases) or in [Downloads](https://www.dashbeam.net/en/downloads) page.
 
 
 
@@ -120,15 +121,15 @@ More options at [GitHub Releases](https://github.com/tonyantony300/dashbeam/rele
 
 <a href="https://www.testmuai.com" rel="nofollow">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://www.altsendme.com/assets/sponsors/testmu-light.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://www.altsendme.com/assets/sponsors/testmu-dark.svg">
-    <img src="https://www.altsendme.com/assets/sponsors/testmu-dark.svg" height="80" alt="TestMuAI">
+    <source media="(prefers-color-scheme: dark)" srcset="https://www.dashbeam.net/assets/sponsors/testmu-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://www.dashbeam.net/assets/sponsors/testmu-dark.svg">
+    <img src="https://www.dashbeam.net/assets/sponsors/testmu-dark.svg" height="80" alt="TestMuAI">
   </picture>
 </a>
 
 We're looking for Partners to join our mission! Partner with us and support while we push the boundaries of peer-to-peer file transfer.
 
-[**LET'S CHAT**](https://www.altsendme.com/en/contact)
+[**LET'S CHAT**](https://www.dashbeam.net/en/contact)
 
 
 ## Supported Languages
@@ -166,7 +167,7 @@ On macOS, Windows, Linux, and Android you can pair devices in **Settings → Dev
 | Platforms | CLI + desktop + mobile + web | Desktop + mobile (no web/CLI) | Desktop + mobile (no web/CLI) | CLI only | Web/PWA + Android app + CLI |
 | The catch | WIP | Closed source; data handling cannot be audited | Same-network only, no resume | CLI-only; GUI front-ends are separate, community-maintained | WebRTC/SCTP throughput ceiling; browser memory limits |
 
-[Know more →](https://www.altsendme.com/en/compare)
+[Know more →](https://www.dashbeam.net/en/compare)
 
 ## Under the hood
 
@@ -261,7 +262,7 @@ See [PRIVACY.md](PRIVACY.md) for information about how DashBeam handles your dat
 
 ## Contact
 
-Reach me [here](https://www.altsendme.com/en/contact) for suggestions, feedback or media related communication.
+Reach me [here](https://www.dashbeam.net/en/contact) for suggestions, feedback or media related communication.
 
 
 Thank you for checking out this project! If you find it useful, consider giving it a star and helping spread the word.

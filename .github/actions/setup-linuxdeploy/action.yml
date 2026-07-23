@@ -5,7 +5,7 @@ description: >
   (which lacks LINUXDEPLOY_EXCLUDED_LIBRARIES env-var support). Also exports
   the exclusion env var so the AppImage omits libwayland-client and loads the
   host copy at runtime. Fixes EGL_BAD_PARAMETER on Wayland compositors
-  (tonyantony300/alt-sendme#241, #47).
+  (tonyantony300/dashbeam#241, #47).
 
 runs:
   using: composite
